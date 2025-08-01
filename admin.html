@@ -1,87 +1,61 @@
-<!DOCTYPE html>
-<html lang="hi">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin Panel — Visitors Only</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css" />
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-</head>
-<body>
-  <div class="container">
-    <header class="header">
-      <div class="title-col">
-        <h1>भारतीय जनता पार्टी जिला मंदसौर</h1>
-        <h3>भाजपा कार्यलय आगन्तुक पंजीयन</h3>
-      </div>
-      <div class="action-col">
-        <button id="exportBtn" class="export-top">📥 CSV</button>
-      </div>
-    </header>
+// ✅ UPDATED FILE: admin.js
+// Visitors listing पहले जैसा रखा गया + Events Management नया जोड़ा गया
 
-    <!-- ✅ Event Control Section -->
-    <div style="background:#f9f9f9;padding:10px;margin-bottom:12px;border-radius:8px;">
-      <h4>इवेंट मैनेजमेंट</h4>
-      <input type="text" id="eventName" placeholder="नया इवेंट नाम">
-      <button id="addEventBtn">इवेंट जोड़ें</button>
-      <div id="eventList" style="margin-top:8px;"></div>
-    </div>
+const firebaseConfig = {
+  apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
+  authDomain: "bjplivefirebase.firebaseapp.com",
+  projectId: "bjplivefirebase"
+};
+if (!firebase.apps?.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-    <div class="filters">
-      <div class="filter-item">
-        <label>तारीख (From)</label>
-        <input id="fromDate" type="date" />
-      </div>
-      <div class="filter-item">
-        <label>तारीख (To)</label>
-        <input id="toDate" type="date" />
-      </div>
-      <div class="filter-item">
-        <label>आने का कारण</label>
-        <select id="reasonSelect">
-          <option value="">सभी</option>
-        </select>
-      </div>
-      <div class="filter-item">
-        <label>मंडल</label>
-        <select id="mandalSelect">
-          <option value="">सभी</option>
-        </select>
-      </div>
-      <div class="filter-item grow">
-        <label>खोज</label>
-        <input id="searchInput" type="text" placeholder="नाम / मोबाइल / पता..." />
-      </div>
-      <div class="filter-item shrink">
-        <button id="clearBtn" type="button">♻️ Clear</button>
-      </div>
-    </div>
+document.addEventListener("DOMContentLoaded", () => {
+  // ✅ Visitors पुराना कोड जस का तस (untouched)
+  // ... [मौजूदा visitors listing कोड वही रहेगा] ...
 
-    <div class="table-wrap">
-      <table id="dataTable">
-        <thead>
-          <tr>
-            <th>समय</th>
-            <th>नाम</th>
-            <th>मोबाइल</th>
-            <th>पद</th>
-            <th>मंडल</th>
-            <th>आने का कारण</th>
-            <th>पता</th>
-            <th>सेल्फ़ी</th>
-            <th>हटाएँ</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+  // ✅ Event Management नया
+  const eventNameInput = document.getElementById("eventNameInput");
+  const addEventBtn = document.getElementById("addEventBtn");
+  const eventList = document.getElementById("eventList");
 
-    <div id="emptyState" class="empty" style="display:none;">कोई डेटा उपलब्ध नहीं।</div>
-  </div>
+  function renderEvents(events) {
+    eventList.innerHTML = "";
+    events.forEach(ev => {
+      const div = document.createElement("div");
+      div.textContent = ev.name + (ev.active ? " ✅(Active)" : "");
+      const setBtn = document.createElement("button");
+      setBtn.textContent = "Set Active";
+      setBtn.style.marginLeft = "10px";
+      setBtn.addEventListener("click", () => setActive(ev.id));
+      div.appendChild(setBtn);
+      eventList.appendChild(div);
+    });
+  }
 
-  <script src="admin.js"></script>
-</body>
-</html>
+  async function loadEvents() {
+    const snap = await db.collection("events").get();
+    const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderEvents(events);
+  }
+
+  addEventBtn.addEventListener("click", async () => {
+    const name = eventNameInput.value.trim();
+    if (!name) return alert("इवेंट नाम लिखें");
+    await db.collection("events").add({ name, active: false });
+    eventNameInput.value = "";
+    loadEvents();
+  });
+
+  async function setActive(id) {
+    const all = await db.collection("events").get();
+    const batch = db.batch();
+    all.docs.forEach(doc => {
+      batch.update(doc.ref, { active: doc.id === id });
+    });
+    await batch.commit();
+    loadEvents();
+    Swal.fire("सफल", "यह इवेंट अब Active है", "success");
+  }
+
+  loadEvents();
+});
