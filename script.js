@@ -1,0 +1,1 @@
+// Full working JS: camera preview, selfie capture, quick submit, event dropdown
