@@ -6,18 +6,13 @@
   <title>Admin Panel — Visitors Only</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="admin.css" />
-  <!-- Firebase (compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <!-- SweetAlert for photo preview -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
   <div class="container">
     <header class="header">
-      <div class="logo-col">
-        <!-- चाहें तो यहाँ लोगो का <img> जोड़ सकते हैं -->
-      </div>
       <div class="title-col">
         <h1>भारतीय जनता पार्टी जिला मंदसौर</h1>
         <h3>भाजपा कार्यलय आगन्तुक पंजीयन</h3>
@@ -26,13 +21,14 @@
         <button id="exportBtn" class="export-top">📥 CSV</button>
       </div>
     </header>
-<!-- Event Control सेक्शन -->
-<div class="event-control">
-  <h3>ईवेंट प्रबंधन</h3>
-  <input type="text" id="newEventName" placeholder="नया इवेंट नाम दर्ज करें" />
-  <button id="addEventBtn">➕ इवेंट जोड़ें</button>
-  <ul id="eventList"></ul>
-</div>
+
+    <!-- ✅ Event Control Section -->
+    <div style="background:#f9f9f9;padding:10px;margin-bottom:12px;border-radius:8px;">
+      <h4>इवेंट मैनेजमेंट</h4>
+      <input type="text" id="eventName" placeholder="नया इवेंट नाम">
+      <button id="addEventBtn">इवेंट जोड़ें</button>
+      <div id="eventList" style="margin-top:8px;"></div>
+    </div>
 
     <div class="filters">
       <div class="filter-item">
@@ -76,7 +72,7 @@
             <th>आने का कारण</th>
             <th>पता</th>
             <th>सेल्फ़ी</th>
-            <th>हटाएँ</th> <!-- ➕ नया कॉलम -->
+            <th>हटाएँ</th>
           </tr>
         </thead>
         <tbody></tbody>
