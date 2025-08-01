@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Panel — Visitors Only</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css" />
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <!-- SweetAlert for photo preview -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo-col">
+        <!-- चाहें तो यहाँ लोगो का <img> जोड़ सकते हैं -->
+      </div>
+      <div class="title-col">
+        <h1>भारतीय जनता पार्टी जिला मंदसौर</h1>
+        <h3>भाजपा कार्यलय आगन्तुक पंजीयन</h3>
+      </div>
+      <div class="action-col">
+        <button id="exportBtn" class="export-top">📥 CSV</button>
+      </div>
+    </header>
+
+    <div class="filters">
+      <div class="filter-item">
+        <label>तारीख (From)</label>
+        <input id="fromDate" type="date" />
+      </div>
+      <div class="filter-item">
+        <label>तारीख (To)</label>
+        <input id="toDate" type="date" />
+      </div>
+      <div class="filter-item">
+        <label>आने का कारण</label>
+        <select id="reasonSelect">
+          <option value="">सभी</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label>मंडल</label>
+        <select id="mandalSelect">
+          <option value="">सभी</option>
+        </select>
+      </div>
+      <div class="filter-item grow">
+        <label>खोज</label>
+        <input id="searchInput" type="text" placeholder="नाम / मोबाइल / पता..." />
+      </div>
+      <div class="filter-item shrink">
+        <button id="clearBtn" type="button">♻️ Clear</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>समय</th>
+            <th>नाम</th>
+            <th>मोबाइल</th>
+            <th>पद</th>
+            <th>मंडल</th>
+            <th>आने का कारण</th>
+            <th>पता</th>
+            <th>सेल्फ़ी</th>
+            <th>हटाएँ</th> <!-- ➕ नया कॉलम -->
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="emptyState" class="empty" style="display:none;">कोई डेटा उपलब्ध नहीं।</div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

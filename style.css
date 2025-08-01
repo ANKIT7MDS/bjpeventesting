@@ -1,0 +1,85 @@
+/* Base Reset */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Body & Container Styling */
+body {
+  background: linear-gradient(135deg, #ff6a00, #ffa41b);
+  font-family: 'Noto Sans Devanagari', sans-serif;
+  display: flex; justify-content: center; padding: 20px 0;
+}
+.container {
+  background: #fff8ef;
+  width: 100%;
+  max-width: 600px;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+/* Headings & Form Field Labels */
+h2 {
+  text-align: center;
+  color: #ff6a00;
+  margin-bottom: 20px;
+}
+label {
+  display: block;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #555;
+}
+
+/* Inputs, Selects, Buttons */
+input[type="text"], input[type="tel"], select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+}
+button, input[type="button"] {
+  width: 100%;
+  padding: 12px;
+  background-color: #ff6a00;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 20px;
+}
+button:hover, input[type="button"]:hover {
+  background-color: #e65e00;
+}
+
+/* कैमरा और फोटो प्रीव्यू बॉक्स छोटा करें */
+video, canvas {
+  width: 70%;
+  max-width: 250px;
+  margin: 10px auto;
+  display: block;
+  border-radius: 8px;
+}
+
+/* धन्यवाद मैसेज को ट्रांसपेरेंट और सुंदर बनाएं */
+.swal2-popup {
+  background: rgba(255, 255, 255, 0.8) !important;
+  font-size: 16px;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+
+/* Status Message (Optional Thank You) */
+#thankYouMsg {
+  display: none;
+  background: #dff0d8;
+  color: #3c763d;
+  padding: 16px;
+  text-align: center;
+  font-weight: bold;
+  border-radius: 8px;
+  margin-top: 20px;
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>प्रवास कार्यक्रम – Index (Tabs Hub)</title>
+<style>
+:root { --accent:#1F3B73; --brand:#E77019; --bg:#f6f7fb; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:"Noto Sans Devanagari","Hind",system-ui,Arial,sans-serif; background:var(--bg); }
+.header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#fff; border-bottom:3px solid var(--brand); }
+.header .title { font-weight:800; color:var(--accent); font-size:18px; }
+.tabs { display:flex; gap:8px; padding:8px 14px; background:#fff; border-bottom:1px solid #eee; flex-wrap:wrap; }
+.tab { border:1px solid var(--accent); background:#eef3ff; color:var(--accent); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:600; }
+.tab.active { background:var(--accent); color:#fff; }
+.actions { margin-left:auto; display:flex; gap:8px; }
+.btn { border:1px solid var(--brand); background:#fff7ef; color:#9A3E00; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:700; }
+.frame-wrap { width:100%; height:calc(100vh - 110px); }
+iframe { width:100%; height:100%; border:0; background:#fff; }
+.footer { padding:6px 12px; font-size:12px; color:#666; background:#fff; border-top:1px solid #eee; }
+@media (max-width:640px) { .frame-wrap { height:calc(100vh - 140px); } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">माननीय जिला अध्यक्ष जी – प्रवास कार्यक्रम (Hub)</div>
+    <div class="actions">
+      <button class="btn" id="openNew">नया टैब</button>
+      <button class="btn" id="hardRefresh">रिफ्रेश</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <!-- 👇 आपके repo के exact फ़ाइल-नाम -->
+    <button class="tab active" data-url="karyakram_themeA_csv_ENHANCED.html">Theme A (डिफ़ॉल्ट)</button>
+    <button class="tab" data-url="karyakram_analytics_dashboard.html">Analytics Dashboard</button>
+    <button class="tab" data-url="karyakram_tv_slideshow.html">TV मोड</button>
+  </div>
+
+  <div class="frame-wrap">
+    <!-- डिफ़ॉल्ट लोड वही फ़ाइल; cache-bust के लिये v=timestamp -->
+    <iframe id="frame" src="karyakram_themeA_csv_ENHANCED.html?v=1" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+  </div>
+
+  <div class="footer">© 2025 • Hub • अगर पेज न दिखे तो ऊपर "रिफ्रेश" दबाएँ।</div>
+
+<script>
+const frame = document.getElementById('frame');
+const tabs = document.querySelectorAll('.tab');
+const openNewBtn = document.getElementById('openNew');
+const refreshBtn = document.getElementById('hardRefresh');
+
+function setActive(tabEl) {
+  tabs.forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  const url = tabEl.getAttribute('data-url');
+  frame.src = url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(); // cache-bust
+  location.hash = '#page=' + encodeURIComponent(url); // deep-link
+}
+tabs.forEach(t => t.addEventListener('click', () => setActive(t)));
+openNewBtn.addEventListener('click', () => {
+  const active = document.querySelector('.tab.active');
+  const url = active ? active.getAttribute('data-url') : frame.src;
+  window.open(url, '_blank');
+});
+refreshBtn.addEventListener('click', () => {
+  const src = frame.src.split('#')[0];
+  const bust = 'v=' + (Date.now());
+  frame.src = src.replace(/([?&])v=\d+/, '$1' + bust);
+});
+// deep-link support
+(function initFromHash(){
+  const m = location.hash.match(/#page=([^&]+)/);
+  if (m) {
+    const want = decodeURIComponent(m[1]);
+    const tab = Array.from(tabs).find(t => t.getAttribute('data-url') === want);
+    if (tab) setActive(tab);
+  }
+})();
+</script>
+</body>
+</html>

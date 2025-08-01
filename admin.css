@@ -1,0 +1,89 @@
+* { box-sizing: border-box; }
+body {
+  font-family: 'Noto Sans Devanagari', system-ui, -apple-system, Arial, sans-serif;
+  background: #f6f6f6;
+  margin: 0;
+}
+.container {
+  max-width: 1220px;
+  margin: 24px auto;
+  background: #fff;
+  padding: 18px 18px 26px;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+/* Header */
+.header {
+  display: grid;
+  grid-template-columns: 120px 1fr 120px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.header h1 {
+  margin: 0;
+  color: #ff6a00;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+.header h3 {
+  margin: 2px 0 0;
+  color: #444;
+  font-weight: 700;
+  text-align: center;
+}
+.export-top {
+  width: 100%; padding: 10px 12px; border: 0; border-radius: 10px;
+  background: #ff6a00; color: #fff; font-weight: 700; cursor: pointer;
+}
+.export-top:hover { background: #e55f00; }
+
+/* Filters row */
+.filters {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 14px 0 16px;
+}
+.filter-item { display: flex; flex-direction: column; gap: 6px; }
+.filter-item.grow { grid-column: span 2; }
+.filter-item.shrink { align-self: end; }
+.filters label { font-size: 13px; color: #555; }
+.filters input, .filters select {
+  padding: 9px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
+}
+.filters button { padding: 9px 12px; border: 0; border-radius: 8px; background: #eee; cursor: pointer; }
+.filters button:hover { background: #e6e6e6; }
+
+/* Table */
+.table-wrap { overflow-x: auto; border: 1px solid #eee; border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; min-width: 950px; }
+thead { background: #ff6a00; color: #fff; }
+th, td { padding: 10px; border-bottom: 1px solid #f0f0f0; text-align: left; font-size: 14px; }
+tbody tr:nth-child(even) { background: #fafafa; }
+
+img.preview {
+  width: 64px; height: 64px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #eee;
+}
+
+.empty { text-align: center; color: #999; padding: 24px 0; font-size: 15px; }
+
+/* Small screens */
+@media (max-width: 840px) {
+  .header { grid-template-columns: 1fr; text-align: center; }
+  .export-top { width: auto; justify-self: center; }
+  .filters { grid-template-columns: 1fr 1fr; }
+  .filter-item.grow { grid-column: span 2; }
+}
+button.btn-del {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #dc3545; /* red */
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+button.btn-del:hover { background: #b02a37; }

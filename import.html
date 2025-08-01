@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visitors Importer (CSV → Firestore)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Noto Sans Devanagari',system-ui,-apple-system,Arial,sans-serif;background:#f6f6f6;margin:0}
+    .box{max-width:980px;margin:24px auto;background:#fff;padding:18px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+    h2{margin:0 0 6px;color:#ff6a00}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+    input[type="file"]{padding:8px}
+    button{padding:10px 14px;border:0;border-radius:8px;background:#ff6a00;color:#fff;font-weight:700;cursor:pointer}
+    button:hover{background:#e55f00}
+    label{font-size:14px;color:#444}
+    .muted{color:#777;font-size:13px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #eee;padding:8px;text-align:left;font-size:13px}
+    thead{background:#ff6a00;color:#fff}
+    .ok{color:#0a8a0a;font-weight:700}
+    .warn{color:#c77a00;font-weight:700}
+    .err{color:#d32f2f;font-weight:700}
+    progress{width:240px;height:14px}
+  </style>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <!-- CSV parser -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="box">
+    <h2>Visitors Importer</h2>
+    <div class="muted">CSV चुनें → Preview देखें → Import करें। यह केवल <b>visitors</b> कलेक्शन में डालेगा (पुराने jila_format_2025 में नहीं)।</div>
+
+    <div class="row">
+      <input type="file" id="file" accept=".csv" />
+      <label><input type="checkbox" id="skipDup" checked /> डुप्लीकेट मोबाइल मिले तो स्किप करें</label>
+      <label><input type="checkbox" id="useNowTS" /> CSV का timestamp ignore करके <b>अब</b> का समय रखें</label>
+      <label><input type="checkbox" id="fixDrive" checked /> Google Drive फोटो लिंक को <b>सीधा image लिंक</b> में बदलें</label>
+      <button id="parseBtn">Preview</button>
+      <button id="importBtn" disabled>Import</button>
+      <progress id="prog" value="0" max="100" style="display:none;"></progress>
+      <span id="status" class="muted"></span>
+    </div>
+
+    <div id="report" class="muted"></div>
+
+    <table id="preview" style="display:none;">
+      <thead><tr id="phead"></tr></thead>
+      <tbody id="pbody"></tbody>
+    </table>
+  </div>
+
+  <script src="import.js"></script>
+</body>
+</html>
