@@ -1,82 +1,70 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>प्रवास कार्यक्रम – Index (Tabs Hub)</title>
-<style>
-:root { --accent:#1F3B73; --brand:#E77019; --bg:#f6f7fb; }
-* { box-sizing: border-box; }
-body { margin:0; font-family:"Noto Sans Devanagari","Hind",system-ui,Arial,sans-serif; background:var(--bg); }
-.header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:#fff; border-bottom:3px solid var(--brand); }
-.header .title { font-weight:800; color:var(--accent); font-size:18px; }
-.tabs { display:flex; gap:8px; padding:8px 14px; background:#fff; border-bottom:1px solid #eee; flex-wrap:wrap; }
-.tab { border:1px solid var(--accent); background:#eef3ff; color:var(--accent); padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:600; }
-.tab.active { background:var(--accent); color:#fff; }
-.actions { margin-left:auto; display:flex; gap:8px; }
-.btn { border:1px solid var(--brand); background:#fff7ef; color:#9A3E00; padding:6px 10px; border-radius:8px; cursor:pointer; font-weight:700; }
-.frame-wrap { width:100%; height:calc(100vh - 110px); }
-iframe { width:100%; height:100%; border:0; background:#fff; }
-.footer { padding:6px 12px; font-size:12px; color:#666; background:#fff; border-top:1px solid #eee; }
-@media (max-width:640px) { .frame-wrap { height:calc(100vh - 140px); } }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>आगंतुक पंजीयन</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="header">
-    <div class="title">माननीय जिला अध्यक्ष जी – प्रवास कार्यक्रम (Hub)</div>
-    <div class="actions">
-      <button class="btn" id="openNew">नया टैब</button>
-      <button class="btn" id="hardRefresh">रिफ्रेश</button>
-    </div>
+  <div class="container">
+    <!-- ✅ हेडिंग अब Dynamic होगी -->
+    <h2 id="form-heading">भाजपा कार्यालय पर आपका स्वागत है</h2>
+    <form id="visitor-form">
+      <label for="mobile">मोबाइल नंबर:</label>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="tel" id="mobile" name="mobile" required pattern="[0-9]{10}" placeholder="10 अंकों का मोबाइल नंबर" style="flex: 1;">
+        <span style="cursor: pointer; font-size: 20px; margin-top: 4px;">🔍</span>
+      </div>
+
+      <label for="name">नाम:</label>
+      <input type="text" id="name" name="name" required placeholder="अपना नाम दर्ज करें">
+
+      <label for="designation">पद:</label>
+      <input type="text" id="designation" name="designation" required placeholder="आपका पद दर्ज करें">
+
+      <label for="address">पता / वार्ड / बूथ:</label>
+      <input type="text" id="address" name="address" required placeholder="पूरा पता लिखें">
+
+      <label for="mandal">मंडल:</label>
+      <select id="mandal" name="mandal" required>
+        <option value="">मंडल चुनें</option>
+        <option>भेंसोदा</option><option>भानपुरा</option><option>गरोठ</option><option>मेलखेडा</option>
+        <option>खड़ावदा</option><option>शामगढ़</option><option>सुवासरा</option><option>बसाई</option>
+        <option>सीतामऊ</option><option>क्यामपुर</option><option>सीतामऊ ग्रामीण</option><option>गुर्जर बरडिया</option>
+        <option>धुंदधड़का</option><option>बुढा</option><option>पिपलिया मंडी</option><option>मल्हारगढ़</option>
+        <option>दलोदा</option><option>मगरामाता जी</option><option>मंदसौर ग्रामीण</option><option>मंदसौर उत्तर</option>
+        <option>मंदसौर दक्षिण</option><option>अन्य जिले से आये</option>
+      </select>
+
+      <label for="reason">आने का कारण:</label>
+      <select id="reason" name="reason" required>
+        <option value="">कारण चुनें</option>
+        <option>कार्यालय पर बैठक</option><option>जिला अध्यक्ष से भेंट</option>
+        <option>ट्रांसफर / शासकीय कार्य / शिकायत</option><option>कार्यालय पर सामान्य उपस्थिति</option>
+        <option>अन्य कोई कार्य</option>
+      </select>
+
+      <label>सेल्फी लें:</label>
+      <video id="camera" autoplay playsinline></video>
+      <canvas id="snapshot" style="display:none;"></canvas>
+      <input type="hidden" id="selfieData" name="selfieData">
+      <button type="button" onclick="capturePhoto()">📷 फोटो लें</button>
+
+      <button type="submit">सबमिट करें</button>
+    </form>
   </div>
 
-  <div class="tabs">
-    <!-- 👇 आपके repo के exact फ़ाइल-नाम -->
-    <button class="tab active" data-url="karyakram_themeA_csv_ENHANCED.html">Theme A (डिफ़ॉल्ट)</button>
-    <button class="tab" data-url="karyakram_analytics_dashboard.html">Analytics Dashboard</button>
-    <button class="tab" data-url="karyakram_tv_slideshow.html">TV मोड</button>
-  </div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 
-  <div class="frame-wrap">
-    <!-- डिफ़ॉल्ट लोड वही फ़ाइल; cache-bust के लिये v=timestamp -->
-    <iframe id="frame" src="karyakram_themeA_csv_ENHANCED.html?v=1" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-  </div>
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-  <div class="footer">© 2025 • Hub • अगर पेज न दिखे तो ऊपर "रिफ्रेश" दबाएँ।</div>
-
-<script>
-const frame = document.getElementById('frame');
-const tabs = document.querySelectorAll('.tab');
-const openNewBtn = document.getElementById('openNew');
-const refreshBtn = document.getElementById('hardRefresh');
-
-function setActive(tabEl) {
-  tabs.forEach(t => t.classList.remove('active'));
-  tabEl.classList.add('active');
-  const url = tabEl.getAttribute('data-url');
-  frame.src = url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(); // cache-bust
-  location.hash = '#page=' + encodeURIComponent(url); // deep-link
-}
-tabs.forEach(t => t.addEventListener('click', () => setActive(t)));
-openNewBtn.addEventListener('click', () => {
-  const active = document.querySelector('.tab.active');
-  const url = active ? active.getAttribute('data-url') : frame.src;
-  window.open(url, '_blank');
-});
-refreshBtn.addEventListener('click', () => {
-  const src = frame.src.split('#')[0];
-  const bust = 'v=' + (Date.now());
-  frame.src = src.replace(/([?&])v=\d+/, '$1' + bust);
-});
-// deep-link support
-(function initFromHash(){
-  const m = location.hash.match(/#page=([^&]+)/);
-  if (m) {
-    const want = decodeURIComponent(m[1]);
-    const tab = Array.from(tabs).find(t => t.getAttribute('data-url') === want);
-    if (tab) setActive(tab);
-  }
-})();
-</script>
+  <!-- Custom JS -->
+  <script src="script.js"></script>
 </body>
 </html>
