@@ -1,9 +1,5 @@
 // ===============================
-// Admin Panel (Visitors + Events + Analytics)
-// - Visitors list (unchanged base)
-// - Event management (dropdown + set active + clear)
-// - Filters: date/reason/mandal + VisitorType + EventFilter
-// - Analytics: per-person counts, busiest office days, event-wise counts, selected event details
+// Admin Panel (Visitors + Events + Analytics + Pagination)
 // ===============================
 
 const firebaseConfig = {
@@ -26,6 +22,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const exportBtn    = document.getElementById("exportBtn");
   const clearBtn     = document.getElementById("clearBtn");
 
+  // NEW: Pagination controls
+  const PAGE_SIZE = 30;
+  let currentPage = 1;
+  const firstPageBtn = document.getElementById("firstPage");
+  const prevPageBtn  = document.getElementById("prevPage");
+  const nextPageBtn  = document.getElementById("nextPage");
+  const lastPageBtn  = document.getElementById("lastPage");
+  const pageInfo     = document.getElementById("pageInfo");
+  const rowInfo      = document.getElementById("rowInfo");
+
   // NEW: Visitor type + event filter
   const visitorType  = document.getElementById("visitorType");   // all | office | event
   const eventFilter  = document.getElementById("eventFilter");   // event name
@@ -41,9 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let allRows = [];      // visitors का पूरा डेटा
   let viewRows = [];     // फ़िल्टर के बाद
   let EVENTS = [];       // {id,name,active}
-  let EVENT_SET = new Set(); // खोज के लिए
+  let EVENT_SET = new Set();
 
-  // स्थायी लिस्ट (आपके फॉर्म की तरह)
+  // स्थायी लिस्ट
   const REASONS = [
     "कार्यालय पर बैठक",
     "जिला अध्यक्ष से भेंट",
@@ -70,29 +76,29 @@ document.addEventListener("DOMContentLoaded", () => {
     mandalSelect.appendChild(op);
   });
 
-  // 🔁 Realtime: visitors (latest first)
+  // 🔁 Realtime: visitors
   db.collection("visitors")
     .orderBy("timestamp", "desc")
     .limit(2000)
     .onSnapshot((snap) => {
       allRows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      currentPage = 1;         // नया डेटा आने पर पहले पेज से दिखाएँ
       applyFilter();
     }, (err) => {
       console.error("Firestore listeners error:", err);
       tb.innerHTML = `<tr><td colspan="9">❌ डेटा लोड करने में समस्या</td></tr>`;
     });
 
-  // 🔁 Realtime: events (for management + filters)
+  // 🔁 Realtime: events
   db.collection("events").orderBy("name").onSnapshot((snap) => {
     EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     EVENT_SET = new Set(EVENTS.map(e => (e.name || "").toString().trim()));
     fillEventDropdowns();
     updateActiveEventLabel();
-    applyFilter(); // क्योंकि event-set बदल सकता है
+    applyFilter();
   });
 
   function fillEventDropdowns(){
-    // Active-set dropdown (management)
     if (eventActiveSelect) {
       eventActiveSelect.innerHTML = "";
       EVENTS.forEach(ev => {
@@ -102,25 +108,23 @@ document.addEventListener("DOMContentLoaded", () => {
         eventActiveSelect.appendChild(op);
       });
     }
-    // Filter dropdown (viewer)
     if (eventFilter) {
-      const selVal = eventFilter.value;
+      const prevVal = eventFilter.value;
       eventFilter.innerHTML = `<option value="">— सभी इवेंट —</option>`;
       EVENTS.forEach(ev => {
         const op = document.createElement("option");
         op.value = ev.name; op.textContent = ev.name + (ev.active ? " (Active)" : "");
         eventFilter.appendChild(op);
       });
-      // restore selection if possible
-      if (selVal && Array.from(eventFilter.options).some(o => o.value === selVal)) {
-        eventFilter.value = selVal;
+      if (prevVal && Array.from(eventFilter.options).some(o => o.value === prevVal)) {
+        eventFilter.value = prevVal;
       }
     }
   }
 
   function updateActiveEventLabel(){
     const act = EVENTS.find(e => e.active);
-    activeEventLabel.textContent = act ? act.name : "—";
+    if (activeEventLabel) activeEventLabel.textContent = act ? act.name : "—";
     if (act && eventActiveSelect) eventActiveSelect.value = act.id;
   }
 
@@ -140,9 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!id) return;
       const all = await db.collection("events").get();
       const batch = db.batch();
-      all.docs.forEach(doc => {
-        batch.update(doc.ref, { active: doc.id === id });
-      });
+      all.docs.forEach(doc => batch.update(doc.ref, { active: doc.id === id }));
       await batch.commit();
       Swal.fire("सफल", "यह इवेंट अब Active है।", "success");
     });
@@ -170,15 +172,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const q = (searchInput.value || "").toLowerCase().trim();
     const r = reasonSelect.value || "";
     const m = mandalSelect.value || "";
-    const vt = (visitorType.value || "all");   // all | office | event
-    const evName = (eventFilter.value || "");  // event name or ""
+    const vt = (visitorType?.value || "all");   // all | office | event
+    const evName = (eventFilter?.value || "");  // event name or ""
 
     // Date range
     const from = fromDate.value ? new Date(fromDate.value + "T00:00:00") : null;
     const to   = toDate.value   ? new Date(toDate.value   + "T23:59:59") : null;
 
     viewRows = allRows.filter(row => {
-      // normalize fields
       const name   = (row.name || row["नाम"] || "").toLowerCase();
       const mobile = (row.mobile || row["मोबाइल"] || "").toLowerCase();
       const mandal = (row.mandal || row["मंडल"] || "");
@@ -191,7 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Office vs Event tagging
       const isEvent = EVENT_SET.has(reason);
-      const isOffice = !isEvent; // (डिफॉल्ट/ऑफिस कारण)
+      const isOffice = !isEvent;
 
       // VisitorType filter
       const matchesType =
@@ -212,34 +213,79 @@ document.addEventListener("DOMContentLoaded", () => {
       return matchesSearch && matchesReason && matchesMandal && matchesType && matchesEventName && matchesDate;
     });
 
+    // हर बार फ़िल्टर बदलते ही पहले पेज पर जाएँ
+    currentPage = 1;
+
     render(viewRows);
-    renderAnalytics(viewRows); // analytics भी current filters पर
+    renderAnalytics(viewRows);
   }
+
+  // Pagination helpers
+  function totalPages() {
+    return Math.max(1, Math.ceil(viewRows.length / PAGE_SIZE));
+  }
+  function pageSlice(rows) {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return rows.slice(start, end);
+  }
+  function renderPagination() {
+    const total = viewRows.length;
+    const tp = totalPages();
+    const start = total ? ( (currentPage - 1) * PAGE_SIZE + 1 ) : 0;
+    const end = Math.min(total, currentPage * PAGE_SIZE);
+
+    if (pageInfo) pageInfo.textContent = `Page ${currentPage} / ${tp}`;
+    if (rowInfo)  rowInfo.textContent  = `(${start}–${end} of ${total})`;
+
+    // enable/disable
+    const atFirst = currentPage <= 1;
+    const atLast  = currentPage >= tp;
+    if (firstPageBtn) firstPageBtn.disabled = atFirst;
+    if (prevPageBtn)  prevPageBtn.disabled  = atFirst;
+    if (nextPageBtn)  nextPageBtn.disabled  = atLast;
+    if (lastPageBtn)  lastPageBtn.disabled  = atLast;
+  }
+  function gotoPage(n) {
+    const tp = totalPages();
+    currentPage = Math.min(Math.max(1, n), tp);
+    render(viewRows);
+  }
+
+  // Pager button events
+  firstPageBtn?.addEventListener("click", () => gotoPage(1));
+  prevPageBtn?.addEventListener("click",  () => gotoPage(currentPage - 1));
+  nextPageBtn?.addEventListener("click",  () => gotoPage(currentPage + 1));
+  lastPageBtn?.addEventListener("click",  () => gotoPage(totalPages()));
 
   // UI events
   [fromDate, toDate, reasonSelect, mandalSelect, visitorType, eventFilter].forEach(el => {
-    el.addEventListener("change", applyFilter);
+    el?.addEventListener("change", applyFilter);
   });
   searchInput.addEventListener("input", applyFilter);
   clearBtn.addEventListener("click", () => {
     fromDate.value = ""; toDate.value = "";
     reasonSelect.value = ""; mandalSelect.value = "";
     searchInput.value = "";
-    visitorType.value = "all";
-    eventFilter.value = "";
+    if (visitorType) visitorType.value = "all";
+    if (eventFilter) eventFilter.value = "";
+    currentPage = 1;
     applyFilter();
   });
 
-  // 🖨️ Render table
+  // 🖨️ Render table (with pagination)
   function render(rows) {
     tb.innerHTML = "";
+
     if (!rows.length) {
       emptyState.style.display = "block";
+      renderPagination(); // 0 state
       return;
     }
     emptyState.style.display = "none";
 
-    rows.forEach(r => {
+    const pageRows = pageSlice(rows);
+    pageRows.forEach(r => {
       const ts = r.timestamp?.toDate?.() ? r.timestamp.toDate() : null;
       const timeText = ts ? ts.toLocaleString() : "";
 
@@ -278,9 +324,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
     });
+
+    renderPagination();
   }
 
-  // 🗑️ Entry Delete (Visitors collection) — event delegation
+  // 🗑️ Entry Delete
   tb.addEventListener("click", async (e) => {
     const btn = e.target.closest(".btn-del");
     if (!btn) return;
@@ -312,14 +360,19 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       Swal.fire("हटा दिया गया", "एंट्री सफलतापूर्वक हटाई गई।", "success");
-      // onSnapshot के कारण UI खुद अपडेट हो जाएगा
+
+      // अगर पेज खाली हो जाए तो पिछले पेज पर आ जाएँ
+      const tp = totalPages();
+      if (currentPage > tp) currentPage = tp;
+      render(viewRows);
+
     } catch (err) {
       console.error("Delete error:", err);
       Swal.fire("त्रुटि", "एंट्री हटाने में समस्या आई।", "error");
     }
   });
 
-  // 📥 CSV Export (current filtered rows)
+  // 📥 CSV Export (current filtered rows — सभी पेज)
   exportBtn.addEventListener("click", () => {
     const header = ["समय","नाम","मोबाइल","पद","मंडल","आने का कारण","पता","सेल्फ़ी URL"];
     let csv = header.join(",") + "\n";
@@ -361,24 +414,22 @@ document.addEventListener("DOMContentLoaded", () => {
      ✅ Analytics (current filters applied)
      ============================*/
   function renderAnalytics(rows) {
-    // Build fast lookup for event names
     const evSet = EVENT_SET;
 
-    // Person-wise stats (key by mobile; fallback by name)
-    const person = new Map(); // key => {name,mobile,officeCount,eventCount,events:{[name]:count}}
-    const busyDays = new Map(); // yyyy-mm-dd => office count
-    const eventCounts = new Map(); // eventName => count
+    const person = new Map();
+    const busyDays = new Map();
+    const eventCounts = new Map();
 
-    function keyFor(r){
-      const mobile = (r.mobile || r["मोबाइल"] || "").toString().trim();
-      const name = (r.name || r["नाम"] || "").toString().trim();
-      return mobile || name || r.id;
-    }
     function dateOnly(ts){
       const d = ts?.toDate?.() ? ts.toDate() : null;
       if (!d) return "";
       const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
       return `${y}-${m}-${day}`;
+    }
+    function keyFor(r){
+      const mobile = (r.mobile || r["मोबाइल"] || "").toString().trim();
+      const name = (r.name || r["नाम"] || "").toString().trim();
+      return mobile || name || r.id;
     }
 
     rows.forEach(r => {
@@ -404,29 +455,22 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Top visitors (by officeCount desc, then eventCount)
     const top = Array.from(person.values()).sort((a,b) =>
       (b.officeCount - a.officeCount) || (b.eventCount - a.eventCount)
     );
+    const busy = Array.from(busyDays.entries()).sort((a,b) => b[1]-a[1]);
+    const evSumm = Array.from(eventCounts.entries()).sort((a,b) => b[1]-a[1]);
 
-    // Busy office days
-    const busy = Array.from(busyDays.entries()).sort((a,b) => b[1]-a[1]); // [date, count]
-
-    // Event summary
-    const evSumm = Array.from(eventCounts.entries()).sort((a,b) => b[1]-a[1]); // [event, count]
-
-    // Selected event details
-    const selEventName = eventFilter.value || "";
+    const selEventName = eventFilter?.value || "";
     const selectedEventRows = selEventName
       ? rows.filter(r => (r.reason || r["कारण"] || "") === selEventName)
       : [];
 
-    // Render helpers
-    function htmlTable(headers, rows){
+    function htmlTable(headers, rowsArr){
       let h = `<table style="width:100%; border-collapse:collapse;"><thead><tr>`;
       headers.forEach(th => h += `<th style="border-bottom:1px solid #eee; padding:6px; text-align:left; font-size:13px;">${th}</th>`);
       h += `</tr></thead><tbody>`;
-      rows.forEach(r => {
+      rowsArr.forEach(r => {
         h += `<tr>`;
         r.forEach(td => h += `<td style="border-bottom:1px solid #f3f3f3; padding:6px; font-size:13px;">${td}</td>`);
         h += `</tr>`;
@@ -435,7 +479,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return h;
     }
 
-    // 1) Person-wise
     const personRows = top.slice(0, 200).map(p => {
       const evList = Object.entries(p.events).map(([n,c]) => `${n} (${c})`).join(", ") || "—";
       return [escapeHtml(p.name), p.mobile, p.officeCount, p.eventCount, escapeHtml(evList)];
@@ -443,17 +486,14 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("analyticsTopVisitors").innerHTML =
       htmlTable(["नाम","मोबाइल","Office Visits","Event Visits","Events (count)"], personRows);
 
-    // 2) Busy office days
     const busyRows = busy.slice(0, 60).map(([d,c]) => [d, c]);
     document.getElementById("analyticsBusyOfficeDays").innerHTML =
       htmlTable(["तारीख","Office Count"], busyRows);
 
-    // 3) Event summary
     const evRows = evSumm.map(([n,c]) => [escapeHtml(n), c]);
     document.getElementById("analyticsEventSummary").innerHTML =
       htmlTable(["Event","Count"], evRows);
 
-    // 4) Selected event details
     const selRows = selectedEventRows.slice(0, 500).map(r => {
       const ts = r.timestamp?.toDate?.() ? r.timestamp.toDate().toLocaleString() : "";
       return [escapeHtml(r.name || r["नाम"] || ""), (r.mobile || r["मोबाइल"] || ""), ts, escapeHtml(r.address || r["पता"] || "")];
