@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const eventNameInput = document.getElementById("eventNameInput");
   const addEventBtn = document.getElementById("addEventBtn");
   const eventList = document.getElementById("eventList");
-
+const endEventBtn = document.getElementById("endEventBtn"); //
   let allRows = [];   // visitors का पूरा डेटा
   let viewRows = [];  // फ़िल्टर के बाद
 
@@ -114,6 +114,26 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.value = "";
     applyFilter();
   });
+if (endEventBtn) {
+  endEventBtn.addEventListener("click", async () => {
+    const ok = await Swal.fire({
+      title: "इवेंट समाप्त करें?",
+      text: "Active इवेंट हट जाएगा और फॉर्म default कारण दिखाएगा।",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "हाँ, समाप्त करें"
+    });
+    if (!ok.isConfirmed) return;
+
+    // सभी active इवेंट्स को inactive करें
+    const snap = await db.collection("events").where("active", "==", true).get();
+    const batch = db.batch();
+    snap.docs.forEach(doc => batch.update(doc.ref, { active: false }));
+    await batch.commit();
+
+    Swal.fire("हो गया", "अब कोई इवेंट Active नहीं है। फॉर्म default सूची दिखाएगा।", "success");
+  });
+}
 
   // 🖨️ Render table
   function render(rows) {
