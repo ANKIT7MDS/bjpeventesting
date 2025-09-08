@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Panel — Visitors Only</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans Devanagari', system-ui, -apple-system, Arial, sans-serif;
+      background: #f6f6f6;
+      margin: 0;
+    }
+    .container {
+      max-width: 1220px;
+      margin: 24px auto;
+      background: #fff;
+      padding: 18px 18px 26px;
+      border-radius: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    }
+
+    /* Header */
+    .header {
+      display: grid;
+      grid-template-columns: 120px 1fr 120px;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .header h1 {
+      margin: 0;
+      color: #ff6a00;
+      font-size: 22px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .header h3 {
+      margin: 2px 0 0;
+      color: #444;
+      font-weight: 700;
+      text-align: center;
+    }
+    .export-top {
+      width: 100%; padding: 10px 12px; border: 0; border-radius: 10px;
+      background: #ff6a00; color: #fff; font-weight: 700; cursor: pointer;
+    }
+    .export-top:hover { background: #e55f00; }
+
+    /* Filters row */
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(140px, 1fr));
+      gap: 10px;
+      margin: 14px 0 16px;
+    }
+    .filter-item { display: flex; flex-direction: column; gap: 6px; }
+    .filter-item.grow { grid-column: span 2; }
+    .filter-item.shrink { align-self: end; }
+    .filters label { font-size: 13px; color: #555; }
+    .filters input, .filters select {
+      padding: 9px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;
+    }
+    .filters button { padding: 9px 12px; border: 0; border-radius: 8px; background: #eee; cursor: pointer; }
+    .filters button:hover { background: #e6e6e6; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; border: 1px solid #eee; border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; min-width: 950px; }
+    thead { background: #ff6a00; color: #fff; }
+    th, td { padding: 10px; border-bottom: 1px solid #f0f0f0; text-align: left; font-size: 14px; }
+    tbody tr:nth-child(even) { background: #fafafa; }
+
+    img.preview {
+      width: 64px; height: 64px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #eee;
+    }
+
+    .empty { text-align: center; color: #999; padding: 24px 0; font-size: 15px; }
+
+    /* Small screens */
+    @media (max-width: 840px) {
+      .header { grid-template-columns: 1fr; text-align: center; }
+      .export-top { width: auto; justify-self: center; }
+      .filters { grid-template-columns: 1fr 1fr; }
+      .filter-item.grow { grid-column: span 2; }
+    }
+    button.btn-del {
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: #dc3545; /* red */
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.btn-del:hover { background: #b02a37; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo-col"></div>
+      <div class="title-col">
+        <h1>भारतीय जनता पार्टी जिला मंदसौर</h1>
+        <h3>भाजपा कार्यलय आगन्तुक पंजीयन</h3>
+      </div>
+      <div class="action-col">
+        <button id="exportBtn" class="export-top">📥 CSV</button>
+      </div>
+    </header>
+
+    <div class="filters" style="border:1px solid #eee; padding:10px; margin-bottom:12px;">
+      <div class="filter-item" style="grid-column: span 6;">
+        <label>नया इवेंट जोड़ें</label>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input id="eventNameInput" type="text" placeholder="इवेंट का नाम" />
+          <button id="addEventBtn" type="button">➕ जोड़ें</button>
+
+          <span style="flex-basis:100%; height:6px;"></span>
+
+          <label style="min-width:140px;">Set Active:</label>
+          <select id="eventActiveSelect" style="min-width:240px;"></select>
+          <button id="setActiveBtn" type="button">✅ Set Active</button>
+          <button id="endEventBtn" type="button">⏹️ इवेंट समाप्त करें</button>
+          <span style="margin-left:8px; font-size:13px; color:#444;">Active: <b id="activeEventLabel">—</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="filter-item">
+        <label>तारीख (From)</label>
+        <input id="fromDate" type="date" />
+      </div>
+      <div class="filter-item">
+        <label>तारीख (To)</label>
+        <input id="toDate" type="date" />
+      </div>
+      <div class="filter-item">
+        <label>आने का कारण</label>
+        <select id="reasonSelect">
+          <option value="">सभी</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label>मंडल</label>
+        <select id="mandalSelect">
+          <option value="">सभी</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label>Visitor Type</label>
+        <select id="visitorType">
+          <option value="all">All (सभी)</option>
+          <option value="office">Office Only</option>
+          <option value="event">Event Only</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label>Event Filter</label>
+        <select id="eventFilter">
+          <option value="">— सभी इवेंट —</option>
+        </select>
+      </div>
+
+      <div class="filter-item grow">
+        <label>खोज</label>
+        <input id="searchInput" type="text" placeholder="नाम / मोबाइल / पता..." />
+      </div>
+      <div class="filter-item shrink">
+        <button id="clearBtn" type="button">♻️ Clear</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>समय</th>
+            <th>नाम</th>
+            <th>मोबाइल</th>
+            <th>पद</th>
+            <th>मंडल</th>
+            <th>आने का कारण</th>
+            <th>पता</th>
+            <th>सेल्फ़ी</th>
+            <th>हटाएँ</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="pager" style="display:flex; align-items:center; gap:8px; justify-content:flex-end; margin:10px 2px 0;">
+      <span id="rowInfo" style="font-size:13px; color:#666; margin-right:auto;">(0–0 of 0)</span>
+      <button id="firstPage" type="button">⏮️</button>
+      <button id="prevPage"  type="button">◀️ Prev</button>
+      <span id="pageInfo" style="min-width:110px; text-align:center; font-size:13px; color:#444;">Page 1 / 1</span>
+      <button id="nextPage"  type="button">Next ▶️</button>
+      <button id="lastPage"  type="button">⏭️</button>
+    </div>
+
+    <div id="emptyState" class="empty" style="display:none;">कोई डेटा उपलब्ध नहीं।</div>
+
+    <div class="filters" style="margin-top:16px;">
+      <div class="filter-item" style="grid-column: span 3;">
+        <label><b>व्यक्ति-वार विज़िट सारांश</b> (फिल्टर/डेट रेंज लागू)</label>
+        <div id="analyticsTopVisitors" class="table-wrap" style="max-height:320px; overflow:auto;"></div>
+      </div>
+      <div class="filter-item" style="grid-column: span 3;">
+        <label><b>Office – सबसे व्यस्त दिन</b></label>
+        <div id="analyticsBusyOfficeDays" class="table-wrap" style="max-height:320px; overflow:auto;"></div>
+      </div>
+      <div class="filter-item" style="grid-column: span 3;">
+        <label><b>Event-wise उपस्थिति</b></label>
+        <div id="analyticsEventSummary" class="table-wrap" style="max-height:320px; overflow:auto;"></div>
+      </div>
+      <div class="filter-item" style="grid-column: span 3;">
+        <label><b>चयनित इवेंट – विज़िटर लिस्ट</b></label>
+        <div id="analyticsSelectedEvent" class="table-wrap" style="max-height:320px; overflow:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
+      authDomain: "bjplivefirebase.firebaseapp.com",
+      projectId: "bjplivefirebase"
+    };
+    if (!firebase.apps?.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const tb = document.querySelector("#dataTable tbody");
+      const emptyState = document.getElementById("emptyState");
+
+      const fromDate = document.getElementById("fromDate");
+      const toDate   = document.getElementById("toDate");
+      const reasonSelect = document.getElementById("reasonSelect");
+      const mandalSelect = document.getElementById("mandalSelect");
+      const searchInput  = document.getElementById("searchInput");
+      const exportBtn    = document.getElementById("exportBtn");
+      const clearBtn     = document.getElementById("clearBtn");
+
+      const PAGE_SIZE = 30;
+      let currentPage = 1;
+      const firstPageBtn = document.getElementById("firstPage");
+      const prevPageBtn  = document.getElementById("prevPage");
+      const nextPageBtn  = document.getElementById("nextPage");
+      const lastPageBtn  = document.getElementById("lastPage");
+      const pageInfo     = document.getElementById("pageInfo");
+      const rowInfo      = document.getElementById("rowInfo");
+
+      const visitorType  = document.getElementById("visitorType");
+      const eventFilter  = document.getElementById("eventFilter");
+
+      const eventNameInput   = document.getElementById("eventNameInput");
+      const addEventBtn      = document.getElementById("addEventBtn");
+      const eventActiveSelect= document.getElementById("eventActiveSelect");
+      const setActiveBtn     = document.getElementById("setActiveBtn");
+      const endEventBtn      = document.getElementById("endEventBtn");
+      const activeEventLabel = document.getElementById("activeEventLabel");
+
+      let allRows = [];
+      let viewRows = [];
+      let EVENTS = [];
+      let EVENT_SET = new Set();
+
+      const REASONS = [
+        "कार्यालय पर बैठक",
+        "जिला अध्यक्ष से भेंट",
+        "ट्रांसफर / शासकीय कार्य / शिकायत",
+        "कार्यालय पर सामान्य उपस्थिति",
+        "अन्य कोई कार्य"
+      ];
+      const MANDALS = [
+        "भेंसोदा","भानपुरा","गरोठ","मेलखेडा","खड़ावदा","शामगढ़","सुवासरा","बसाई",
+        "सीतामऊ","क्यामपुर","सीतामऊ ग्रामीण","गुर्जर बरडिया","धुंदधड़का","बुढा",
+        "पिपलिया मंडी","मल्हारगढ़","दलोदा","मगरामाता जी","मंदसौर ग्रामीण",
+        "मंदसौर उत्तर","मंदसौर दक्षिण","अन्य जिले से आये"
+      ];
+
+      REASONS.forEach(r => {
+        const op = document.createElement("option");
+        op.value = r; op.textContent = r;
+        reasonSelect.appendChild(op);
+      });
+      MANDALS.forEach(m => {
+        const op = document.createElement("option");
+        op.value = m; op.textContent = m;
+        mandalSelect.appendChild(op);
+      });
+
+      db.collection("visitors")
+        .orderBy("timestamp", "desc")
+        .limit(2000)
+        .onSnapshot((snap) => {
+          allRows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          currentPage = 1;
+          applyFilter();
+        }, (err) => {
+          console.error("Firestore listeners error:", err);
+          tb.innerHTML = `<tr><td colspan="9">❌ डेटा लोड करने में समस्या</td></tr>`;
+        });
+
+      db.collection("events").orderBy("name").onSnapshot((snap) => {
+        EVENTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        EVENT_SET = new Set(EVENTS.map(e => (e.name || "").toString().trim()));
+        fillEventDropdowns();
+        updateActiveEventLabel();
+        applyFilter();
+      });
+
+      function fillEventDropdowns(){
+        if (eventActiveSelect) {
+          eventActiveSelect.innerHTML = "";
+          EVENTS.forEach(ev => {
+            const op = document.createElement("option");
+            op.value = ev.id; op.textContent = ev.name;
+            if (ev.active) op.selected = true;
+            eventActiveSelect.appendChild(op);
+          });
+        }
+        if (eventFilter) {
+          const prevVal = eventFilter.value;
+          eventFilter.innerHTML = `<option value="">— सभी इवेंट —</option>`;
+          EVENTS.forEach(ev => {
+            const op = document.createElement("option");
+            op.value = ev.name; op.textContent = ev.name + (ev.active ? " (Active)" : "");
+            eventFilter.appendChild(op);
+          });
+          if (prevVal && Array.from(eventFilter.options).some(o => o.value === prevVal)) {
+            eventFilter.value = prevVal;
+          }
+        }
+      }
+
+      function updateActiveEventLabel(){
+        const act = EVENTS.find(e => e.active);
+        if (activeEventLabel) activeEventLabel.textContent = act ? act.name : "—";
+        if (act && eventActiveSelect) eventActiveSelect.value = act.id;
+      }
+
+      if (addEventBtn) {
+        addEventBtn.addEventListener("click", async () => {
+          const name = (eventNameInput.value || "").trim();
+          if (!name) return alert("इवेंट का नाम लिखें");
+          await db.collection("events").add({ name, active: false });
+          eventNameInput.value = "";
+          Swal.fire("जोड़ा गया", "इवेंट सूची में जोड़ दिया गया है।", "success");
+        });
+      }
+      if (setActiveBtn) {
+        setActiveBtn.addEventListener("click", async () => {
+          const id = eventActiveSelect.value;
+          if (!id) return;
+          const all = await db.collection("events").get();
+          const batch = db.batch();
+          all.docs.forEach(doc => batch.update(doc.ref, { active: doc.id === id }));
+          await batch.commit();
+          Swal.fire("सफल", "यह इवेंट अब Active है।", "success");
+        });
+      }
+      if (endEventBtn) {
+        endEventBtn.addEventListener("click", async () => {
+          const ok = await Swal.fire({
+            title: "इवेंट समाप्त करें?",
+            text: "Active इवेंट हट जाएगा और फॉर्म default कारण दिखाएगा।",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "हाँ, समाप्त करें"
+          });
+          if (!ok.isConfirmed) return;
+          const snap = await db.collection("events").where("active", "==", true).get();
+          const batch = db.batch();
+          snap.docs.forEach(doc => batch.update(doc.ref, { active: false }));
+          await batch.commit();
+          Swal.fire("हो गया", "अब कोई इवेंट Active नहीं है।", "success");
+        });
+      }
+
+      function applyFilter() {
+        const q = (searchInput.value || "").toLowerCase().trim();
+        const r = reasonSelect.value || "";
+        const m = mandalSelect.value || "";
+        const vt = (visitorType?.value || "all");
+        const evName = (eventFilter?.value || "");
+
+        const from = fromDate.value ? new Date(fromDate.value + "T00:00:00") : null;
+        const to   = toDate.value   ? new Date(toDate.value   + "T23:59:59") : null;
+
+        viewRows = allRows.filter(row => {
+          const name   = (row.name || row["नाम"] || "").toLowerCase();
+          const mobile = (row.mobile || row["मोबाइल"] || "").toLowerCase();
+          const mandal = (row.mandal || row["मंडल"] || "");
+          const reason = (row.reason || row["कारण"] || "");
+          const addr   = (row.address || row["पता"] || "").toLowerCase();
+
+          const matchesSearch = !q || name.includes(q) || mobile.includes(q) || addr.includes(q);
+          const matchesReason = !r || reason === r;
+          const matchesMandal = !m || mandal === m;
+
+          const isEvent = EVENT_SET.has(reason);
+          const isOffice = !isEvent;
+
+          const matchesType = (vt === "all") || (vt === "office" && isOffice) || (vt === "event" && isEvent);
+          const matchesEventName = (vt !== "event") || (!evName) || (reason === evName);
+
+          const ts = row.timestamp?.toDate?.() ? row.timestamp.toDate() : null;
+          const matchesDate = (!from && !to) || (ts && (!from || ts >= from) && (!to || ts <= to));
+
+          return matchesSearch && matchesReason && matchesMandal && matchesType && matchesEventName && matchesDate;
+        });
+
+        currentPage = 1;
+        render(viewRows);
+        renderAnalytics(viewRows);
+      }
+
+      function totalPages() { return Math.max(1, Math.ceil(viewRows.length / PAGE_SIZE)); }
+      function pageSlice(rows) {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        return rows.slice(start, start + PAGE_SIZE);
+      }
+      function renderPagination() {
+        const total = viewRows.length;
+        const tp = totalPages();
+        const start = total ? ((currentPage - 1) * PAGE_SIZE + 1) : 0;
+        const end = Math.min(total, currentPage * PAGE_SIZE);
+
+        if (pageInfo) pageInfo.textContent = `Page ${currentPage} / ${tp}`;
+        if (rowInfo)  rowInfo.textContent  = `(${start}–${end} of ${total})`;
+
+        const atFirst = currentPage <= 1;
+        const atLast  = currentPage >= tp;
+        if (firstPageBtn) firstPageBtn.disabled = atFirst;
+        if (prevPageBtn)  prevPageBtn.disabled  = atFirst;
+        if (nextPageBtn)  nextPageBtn.disabled  = atLast;
+        if (lastPageBtn)  lastPageBtn.disabled  = atLast;
+      }
+      function gotoPage(n) {
+        currentPage = Math.min(Math.max(1, n), totalPages());
+        render(viewRows);
+      }
+
+      firstPageBtn?.addEventListener("click", () => gotoPage(1));
+      prevPageBtn?.addEventListener("click",  () => gotoPage(currentPage - 1));
+      nextPageBtn?.addEventListener("click",  () => gotoPage(currentPage + 1));
+      lastPageBtn?.addEventListener("click",  () => gotoPage(totalPages()));
+
+      [fromDate, toDate, reasonSelect, mandalSelect, visitorType, eventFilter].forEach(el => {
+        el?.addEventListener("change", applyFilter);
+      });
+      searchInput.addEventListener("input", applyFilter);
+      clearBtn.addEventListener("click", () => {
+        fromDate.value = ""; toDate.value = "";
+        reasonSelect.value = ""; mandalSelect.value = "";
+        searchInput.value = "";
+        if (visitorType) visitorType.value = "all";
+        if (eventFilter) eventFilter.value = "";
+        currentPage = 1;
+        applyFilter();
+      });
+
+      function render(rows) {
+        tb.innerHTML = "";
+        if (!rows.length) {
+          emptyState.style.display = "block";
+          renderPagination();
+          return;
+        }
+        emptyState.style.display = "none";
+
+        const pageRows = pageSlice(rows);
+        pageRows.forEach(r => {
+          const ts = r.timestamp?.toDate?.() ? r.timestamp.toDate() : null;
+          const timeText = ts ? ts.toLocaleString() : "";
+          const name = r.name || r["नाम"] || "";
+          const mobile = r.mobile || r["मोबाइल"] || "";
+          const desig = r.designation || r["पद"] || "";
+          const mandal = r.mandal || r["मंडल"] || "";
+          const reason = r.reason || r["कारण"] || "";
+          const address = r.address || r["पता"] || "";
+          const selfie = r.selfie || "";
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${timeText}</td>
+            <td>${escapeHtml(name)}</td>
+            <td>${mobile}</td>
+            <td>${escapeHtml(desig)}</td>
+            <td>${escapeHtml(mandal)}</td>
+            <td>${escapeHtml(reason)}</td>
+            <td>${escapeHtml(address)}</td>
+            <td>${selfie ? `<img src="${selfie}" class="preview" alt="selfie">` : "—"}</td>
+            <td><button class="btn-del" data-id="${r.id}" data-selfie="${selfie}">🗑️</button></td>
+          `;
+          tb.appendChild(tr);
+        });
+
+        document.querySelectorAll("img.preview").forEach(img => {
+          img.addEventListener("click", () => {
+            Swal.fire({ imageUrl: img.src, imageAlt: "Selfie", showConfirmButton: false, showCloseButton: true, width: 640 });
+          });
+        });
+        renderPagination();
+      }
+
+      tb.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".btn-del");
+        if (!btn) return;
+        const docId = btn.dataset.id;
+        const selfieUrl = btn.dataset.selfie || "";
+        if (!docId) return;
+
+        const confirm = await Swal.fire({
+          title: "क्या आप इस एंट्री को हटाना चाहते हैं?",
+          text: "हटाने के बाद डेटा वापस नहीं लाया जा सकता।",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "हाँ, हटाएँ",
+          cancelButtonText: "रद्द करें"
+        });
+        if (!confirm.isConfirmed) return;
+
+        try {
+          await db.collection("visitors").doc(docId).delete();
+          if (selfieUrl && firebase.storage) {
+            try {
+              const storageRef = firebase.storage().refFromURL(selfieUrl);
+              await storageRef.delete();
+            } catch (e) {
+              console.warn("Storage delete warning:", e?.message || e);
+            }
+          }
+          Swal.fire("हटा दिया गया", "एंट्री सफलतापूर्वक हटाई गई।", "success");
+          if (currentPage > totalPages()) currentPage = totalPages();
+          render(viewRows);
+        } catch (err) {
+          console.error("Delete error:", err);
+          Swal.fire("त्रुटि", "एंट्री हटाने में समस्या आई।", "error");
+        }
+      });
+
+      exportBtn.addEventListener("click", () => {
+        const header = ["समय","नाम","मोबाइल","पद","मंडल","आने का कारण","पता","सेल्फ़ी URL"];
+        let csv = "\uFEFF" + header.join(",") + "\n"; // Add BOM for Excel
+        viewRows.forEach(r => {
+          const ts = r.timestamp?.toDate?.() ? r.timestamp.toDate().toLocaleString('en-IN') : "";
+          const row = [
+            ts,
+            safeCsv(r.name || r["नाम"] || ""),
+            (r.mobile || r["मोबाइल"] || ""),
+            safeCsv(r.designation || r["पद"] || ""),
+            safeCsv(r.mandal || r["मंडल"] || ""),
+            safeCsv(r.reason || r["कारण"] || ""),
+            safeCsv(r.address || r["पता"] || ""),
+            (r.selfie || "")
+          ];
+          csv += row.join(",") + "\n";
+        });
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "visitors.csv"; a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      function escapeHtml(s) {
+        return (s || "").toString()
+          .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+          .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+      }
+      function safeCsv(s) {
+        const v = (s || "").toString().replace(/"/g, '""');
+        return `"${v}"`;
+      }
+
+      function renderAnalytics(rows) {
+        const evSet = EVENT_SET;
+        const person = new Map(), busyDays = new Map(), eventCounts = new Map();
+
+        function dateOnly(ts){
+          const d = ts?.toDate?.() ? ts.toDate() : null;
+          if (!d) return "";
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        }
+        function keyFor(r){
+          return (r.mobile || r["मोबाइल"] || "").toString().trim() || (r.name || r["नाम"] || "").toString().trim() || r.id;
+        }
+
+        rows.forEach(r => {
+          const reason = (r.reason || r["कारण"] || "").toString().trim();
+          const isEvent = evSet.has(reason);
+          const k = keyFor(r);
+          if (!person.has(k)) person.set(k, {
+            name: (r.name || r["नाम"] || "—"),
+            mobile: (r.mobile || r["मोबाइल"] || "—"),
+            officeCount: 0, eventCount: 0, events: {}
+          });
+          const p = person.get(k);
+          if (isEvent) {
+            p.eventCount++;
+            p.events[reason] = (p.events[reason] || 0) + 1;
+            eventCounts.set(reason, (eventCounts.get(reason) || 0) + 1);
+          } else {
+            p.officeCount++;
+            const d = dateOnly(r.timestamp);
+            if (d) busyDays.set(d, (busyDays.get(d) || 0) + 1);
+          }
+        });
+
+        const top = Array.from(person.values()).sort((a,b) => (b.officeCount - a.officeCount) || (b.eventCount - a.eventCount));
+        const busy = Array.from(busyDays.entries()).sort((a,b) => b[1]-a[1]);
+        const evSumm = Array.from(eventCounts.entries()).sort((a,b) => b[1]-a[1]);
+        const selEventName = eventFilter?.value || "";
+        const selectedEventRows = selEventName ? rows.filter(r => (r.reason || r["कारण"] || "") === selEventName) : [];
+
+        function htmlTable(headers, rowsArr){
+          let h = `<table style="width:100%; border-collapse:collapse;"><thead><tr>`;
+          headers.forEach(th => h += `<th style="border-bottom:1px solid #eee; padding:6px; text-align:left; font-size:13px;">${th}</th>`);
+          h += `</tr></thead><tbody>`;
+          rowsArr.forEach(r => {
+            h += `<tr>`;
+            r.forEach(td => h += `<td style="border-bottom:1px solid #f3f3f3; padding:6px; font-size:13px;">${td}</td>`);
+            h += `</tr>`;
+          });
+          return h + `</tbody></table>`;
+        }
+
+        const personRows = top.slice(0, 200).map(p => {
+          const evList = Object.entries(p.events).map(([n,c]) => `${n} (${c})`).join(", ") || "—";
+          return [escapeHtml(p.name), p.mobile, p.officeCount, p.eventCount, escapeHtml(evList)];
+        });
+        document.getElementById("analyticsTopVisitors").innerHTML = htmlTable(["नाम","मोबाइल","Office Visits","Event Visits","Events (count)"], personRows);
+
+        const busyRows = busy.slice(0, 60).map(([d,c]) => [d, c]);
+        document.getElementById("analyticsBusyOfficeDays").innerHTML = htmlTable(["तारीख","Office Count"], busyRows);
+
+        const evRows = evSumm.map(([n,c]) => [escapeHtml(n), c]);
+        document.getElementById("analyticsEventSummary").innerHTML = htmlTable(["Event","Count"], evRows);
+
+        const selRows = selectedEventRows.slice(0, 500).map(r => {
+          const ts = r.timestamp?.toDate?.() ? r.timestamp.toDate().toLocaleString() : "";
+          return [escapeHtml(r.name || r["नाम"] || ""), (r.mobile || r["मोबाइल"] || ""), ts, escapeHtml(r.address || r["पता"] || "")];
+        });
+        document.getElementById("analyticsSelectedEvent").innerHTML = selEventName
+          ? htmlTable([`Event: ${escapeHtml(selEventName)} — नाम`, "मोबाइल", "समय", "पता"], selRows)
+          : `<div class="empty">कोई इवेंट चयनित नहीं।</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
