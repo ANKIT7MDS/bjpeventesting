@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Contact Importer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { font-family: 'Noto Sans Devanagari', system-ui, sans-serif; background: #f6f6f6; margin: 0; padding: 20px; }
+    .box { max-width: 980px; margin: 24px auto; background: #fff; padding: 18px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+    h2 { margin: 0 0 6px; color: #ff6a00; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+    button { padding: 10px 14px; border: 0; border-radius: 8px; background: #ff6a00; color: #fff; font-weight: 700; cursor: pointer; }
+    .muted { color: #777; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #eee; padding: 8px; text-align: left; font-size: 13px; }
+    thead { background: #f1f1f1; }
+    .ok { color: #0a8a0a; } .err { color: #d32f2f; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>स्मार्ट कॉन्टैक्ट इम्पोर्टर (CSV)</h2>
+    <div class="muted">यह इम्पोर्टर अलग-अलग कॉलम नामों को समझ सकता है। अपनी CSV फाइल को साफ करने के बाद यहाँ अपलोड करें।</div>
+    <div class="row">
+      <input type="file" id="csvFile" accept=".csv" />
+      <button id="parseBtn">📊 Preview</button>
+      <button id="importBtn" disabled>⬆️ Import to Contacts</button>
+      <progress id="prog" value="0" max="100" style="display:none;"></progress>
+      <span id="status" class="muted"></span>
+    </div>
+    <div id="report" class="muted"></div>
+    <table id="previewTable" style="display:none;">
+      <thead><tr id="phead"></tr></thead>
+      <tbody id="pbody"></tbody>
+    </table>
+  </div>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
+      authDomain: "bjplivefirebase.firebaseapp.com",
+      projectId: "bjplivefirebase"
+    };
+    if (!firebase.apps?.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const fileEl = document.getElementById("csvFile"), parseBtn = document.getElementById("parseBtn"),
+          importBtn = document.getElementById("importBtn"), prog = document.getElementById("prog"),
+          statusEl = document.getElementById("status"), reportEl = document.getElementById("report"),
+          prevTbl = document.getElementById("previewTable"), phead = document.getElementById("phead"),
+          pbody = document.getElementById("pbody");
+
+    let parsedRows = [];
+
+    // This function now understands many different column names
+    function getVal(row, keys) { for (const k of keys) { if (row[k]) return row[k]; } return ""; }
+    function normalizeMobile(input) { return (input || "").toString().replace(/\D/g, "").slice(-10); }
+
+    const HEADER_MAP = {
+        mobile: ["मोबाइल", "mobile", "मोबाइल नंबर", "संपर्क नंबर", "संपर्क क्रमांक (1)", "मोबाइल नं."],
+        name: ["नाम", "name"],
+        designation: ["पद", "designation", "भूमिका", "दायित्व", "Booth पद"],
+        address: ["पता", "address", "वर्तमान पता"],
+        mandal: ["मंडल", "mandal"]
+    };
+
+    parseBtn.addEventListener("click", () => {
+      if (!fileEl.files.length) return Swal.fire("फ़ाइल चुनें", "", "warning");
+      Papa.parse(fileEl.files[0], {
+        header: true, skipEmptyLines: true, complete: res => buildPreview(res.data)
+      });
+    });
+
+    function buildPreview(rows) {
+      parsedRows = [];
+      phead.innerHTML = `<tr><th>Status</th><th>Mobile</th><th>Name</th><th>Designation</th><th>Address</th><th>Mandal</th></tr>`;
+      pbody.innerHTML = "";
+      prevTbl.style.display = "table";
+      let okCnt = 0, errCnt = 0;
+
+      rows.forEach(row => {
+        const mobile = normalizeMobile(getVal(row, HEADER_MAP.mobile));
+        const name = getVal(row, HEADER_MAP.name);
+        
+        const payload = {
+          name: name,
+          designation: getVal(row, HEADER_MAP.designation),
+          address: getVal(row, HEADER_MAP.address),
+          mandal: getVal(row, HEADER_MAP.mandal)
+        };
+        
+        let status = "ok", msg = "OK";
+        if (mobile.length !== 10 || !name) {
+          status = "err";
+          msg = mobile.length !== 10 ? "Invalid Mobile" : "Name Missing";
+          errCnt++;
+        } else {
+          okCnt++;
+          parsedRows.push({ mobile, ...payload });
+        }
+        pbody.innerHTML += `<tr class="${status}"><td>${msg}</td><td>${mobile}</td><td>${payload.name}</td><td>${payload.designation}</td><td>${payload.address}</td><td>${payload.mandal}</td></tr>`;
+      });
+      reportEl.textContent = `Total: ${rows.length} | OK: ${okCnt} | Error: ${errCnt}`;
+      importBtn.disabled = parsedRows.length === 0;
+    }
+
+    importBtn.addEventListener("click", async () => {
+      const { isConfirmed } = await Swal.fire({ title: `Import ${parsedRows.length} contacts?`, text: "यह 'contacts' कलेक्शन में रिकॉर्ड जोड़ेगा/अपडेट करेगा।", icon: "question", showCancelButton: true });
+      if (!isConfirmed) return;
+
+      prog.style.display = "inline-block"; prog.value = 0; prog.max = parsedRows.length;
+      statusEl.textContent = "Importing...";
+      let success = 0;
+      
+      const batchSize = 400;
+      for (let i = 0; i < parsedRows.length; i += batchSize) {
+        const batch = db.batch();
+        const chunk = parsedRows.slice(i, i + batchSize);
+        chunk.forEach(r => {
+          const docRef = db.collection("contacts").doc(r.mobile);
+          batch.set(docRef, { name: r.name, designation: r.designation, address: r.address, mandal: r.mandal }, { merge: true });
+        });
+        await batch.commit();
+        success += chunk.length;
+        prog.value = success;
+      }
+      
+      statusEl.textContent = `✔️ पूर्ण। ${success} कॉन्टैक्ट्स इम्पोर्ट/अपडेट हुए।`;
+      Swal.fire("सफलता", statusEl.textContent, "success");
+    });
+  </script>
+</body>
+</html>
+
