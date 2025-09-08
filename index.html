@@ -84,7 +84,10 @@
 
     <form id="visitor-form">
       <label for="mobile">मोबाइल नंबर:</label>
-      <input type="tel" id="mobile" name="mobile" required pattern="[0-9]{10}" placeholder="10 अंकों का मोबाइल नंबर">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="tel" id="mobile" name="mobile" required pattern="[0-9]{10}" placeholder="10 अंकों का मोबाइल नंबर" style="flex: 1;">
+        <span style="cursor: pointer; font-size: 20px; margin-top: 4px;">🔍</span>
+      </div>
 
       <label for="name">नाम:</label>
       <input type="text" id="name" name="name" required placeholder="अपना नाम दर्ज करें">
@@ -137,6 +140,9 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const storage = firebase.storage();
+    
+    const TELEGRAM_BOT_TOKEN = "8064306737:AAFvXvc3vIT1kyccGiPbpYGCAr9dgKJcRzw";
+    const TELEGRAM_CHAT_ID = "733804072";
 
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("visitor-form");
@@ -157,7 +163,6 @@
         { value: "अन्य कोई कार्य", text: "अन्य कोई कार्य" }
       ];
 
-      // Function to set the form to its default state
       function setDefaultForm() {
         formHeading.textContent = defaultHeading;
         reasonSelect.innerHTML = '';
@@ -170,19 +175,13 @@
         reasonSelect.disabled = false;
       }
 
-      // Initial setup
       setDefaultForm();
 
-      // ** NEW: Listen for active events in real-time **
       db.collection("events").where("active", "==", true).onSnapshot(snapshot => {
         if (!snapshot.empty) {
-          // An event is active
           const activeEvent = snapshot.docs[0].data();
           const eventName = activeEvent.name;
-
-          formHeading.textContent = eventName; // Update heading
-
-          // Update and lock the reason dropdown
+          formHeading.textContent = eventName;
           reasonSelect.innerHTML = '';
           const option = document.createElement('option');
           option.value = eventName;
@@ -190,16 +189,13 @@
           option.selected = true;
           reasonSelect.appendChild(option);
           reasonSelect.disabled = true;
-
         } else {
-          // No event is active, revert to default
           setDefaultForm();
         }
       }, err => {
         console.error("Error listening to events:", err);
-        setDefaultForm(); // In case of error, show default form
+        setDefaultForm();
       });
-
 
       async function startCamera() {
         try {
@@ -221,26 +217,28 @@
       };
 
       mobileInput.addEventListener("blur", async (e) => {
-        const mobile = (e.target.value || "").toString().replace(/\D/g, "").slice(-10);
-        e.target.value = mobile;
-        if (mobile.length !== 10) return;
+        try {
+            const mobile = (e.target.value || "").toString().replace(/\D/g, "").slice(-10);
+            e.target.value = mobile;
+            if (mobile.length !== 10) return;
 
-        const snap = await db.collection("visitors").where("mobile", "==", mobile).orderBy("timestamp", "desc").limit(1).get();
-        if (!snap.empty) {
-            const data = snap.docs[0].data();
-            form.name.value = data.name || "";
-            form.designation.value = data.designation || "";
-            form.address.value = data.address || "";
-            form.mandal.value = data.mandal || "";
+            const snap = await db.collection("visitors").where("mobile", "==", mobile).orderBy("timestamp", "desc").limit(1).get();
+            if (!snap.empty) {
+                const data = snap.docs[0].data();
+                form.name.value = data.name || "";
+                form.designation.value = data.designation || "";
+                form.address.value = data.address || "";
+                form.mandal.value = data.mandal || "";
+            }
+        } catch(err) {
+            console.error("Error fetching previous data:", err);
         }
       });
 
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const submitBtn = form.querySelector("button[type='submit']");
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
-
+        
         const formData = {
             name: form.name.value.trim(),
             mobile: form.mobile.value.trim(),
@@ -251,15 +249,18 @@
             selfieData: form.selfieData.value
         };
 
-        if (Object.values(formData).some(val => !val)) {
+        if (!formData.name || !formData.mobile || !formData.designation || !formData.address || !formData.mandal || !formData.reason || !formData.selfieData) {
             Swal.fire("अपूर्ण जानकारी", "कृपया सभी फ़ील्ड भरें और सेल्फ़ी लें।", "warning");
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'सबमिट करें';
             return;
         }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
 
         try {
-            const imgBlob = await (await fetch(formData.selfieData)).blob();
+            const response = await fetch(formData.selfieData);
+            const imgBlob = await response.blob();
+            
             const filePath = `selfies/${Date.now()}_${formData.mobile}.jpg`;
             const up = await storage.ref(filePath).put(imgBlob);
             const selfieURL = await up.ref.getDownloadURL();
@@ -275,18 +276,27 @@
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            const text = `नया आगंतुक:\nनाम: ${formData.name}\nमोबाइल: ${formData.mobile}\nपद: ${formData.designation}\nमंडल: ${formData.mandal}\nपता: ${formData.address}\nकारण: ${formData.reason}\n📷 Selfie: ${selfieURL}`;
+            // We don't wait for this to finish
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
+            }).catch(err => console.warn("Telegram notification failed:", err));
+
+            // Use 'then' to ensure UI updates happen after the modal closes
             Swal.fire({
                 title: "✅ धन्यवाद!",
                 text: "आपकी जानकारी सफलतापूर्वक सेव हो गई है।",
                 icon: "success",
-                timer: 2000,
+                timer: 1500,
                 showConfirmButton: false
+            }).then(() => {
+                form.reset();
+                canvas.style.display = 'none';
+                selfieInput.value = '';
+                startCamera();
             });
-            form.reset();
-            canvas.style.display = 'none';
-            selfieInput.value = '';
-            setDefaultForm(); // Reset reason dropdown after submission
-            startCamera();
 
         } catch (err) {
             console.error("❌ Submit Error:", err);
@@ -300,3 +310,4 @@
   </script>
 </body>
 </html>
+
