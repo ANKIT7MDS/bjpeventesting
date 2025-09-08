@@ -9,11 +9,11 @@
     /* Base Reset */
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Body & Container Styling */
+    /* Body & Container Styling from your style.css */
     body {
       background: linear-gradient(135deg, #ff6a00, #ffa41b);
       font-family: 'Noto Sans Devanagari', sans-serif;
-      display: flex; justify-content: center; align-items: center; padding: 20px 0; min-height: 100vh;
+      display: flex; justify-content: center; padding: 20px 0;
     }
     .container {
       background: #fff8ef;
@@ -62,6 +62,7 @@
       background-color: #e65e00;
     }
 
+    /* Camera and Snapshot styles */
     video, canvas {
       width: 70%;
       max-width: 250px;
@@ -70,6 +71,7 @@
       border-radius: 8px;
     }
 
+    /* SweetAlert styles */
     .swal2-popup {
       background: rgba(255, 255, 255, 0.8) !important;
       font-size: 16px;
@@ -131,18 +133,63 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
+    // Your original, working Firebase config from script.js
     const firebaseConfig = {
       apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
       authDomain: "bjplivefirebase.firebaseapp.com",
       projectId: "bjplivefirebase",
-      storageBucket: "bjplivefirebase.appspot.com",
+      storageBucket: "bjplivefirebase.firebasestorage.app", // Corrected from .appspot.com
+      messagingSenderId: "236867156337",
+      appId: "1:236867156337:web:1fbd6c535689a6f34d5ed0",
+      measurementId: "G-M5KY8DW9JD"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const storage = firebase.storage();
-    
+
     const TELEGRAM_BOT_TOKEN = "8064306737:AAFvXvc3vIT1kyccGiPbpYGCAr9dgKJcRzw";
     const TELEGRAM_CHAT_ID = "733804072";
+
+    // Your original working functions
+    function normalizeMobile(input) {
+      let digits = (input || "").toString().replace(/\D/g, "");
+      if (digits.length > 10) digits = digits.slice(-10);
+      return digits;
+    }
+
+    function queueSave(entry) {
+      const key = "offlineQueueVisitors";
+      const q = JSON.parse(localStorage.getItem(key) || "[]");
+      q.push(entry);
+      localStorage.setItem(key, JSON.stringify(q));
+    }
+
+    async function processQueue() {
+      const key = "offlineQueueVisitors";
+      const q = JSON.parse(localStorage.getItem(key) || "[]");
+      if (!q.length) return;
+
+      const left = [];
+      for (const entry of q) {
+        try {
+          const imgBlob = await (await fetch(entry.selfieData)).blob();
+          const filePath = `selfies/${Date.now()}_${entry.mobile}.jpg`;
+          const up = await storage.ref(filePath).put(imgBlob);
+          const selfieURL = await up.ref.getDownloadURL();
+
+          await db.collection("visitors").add({
+            name: entry.name, mobile: entry.mobile, designation: entry.designation,
+            address: entry.address, mandal: entry.mandal, reason: entry.reason,
+            selfie: selfieURL,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          // Telegram logic can be added here if needed for offline queue
+        } catch (e) {
+          left.push(entry);
+        }
+      }
+      localStorage.setItem(key, JSON.stringify(left));
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("visitor-form");
@@ -153,42 +200,35 @@
       const formHeading = document.getElementById('formHeading');
       const reasonSelect = document.getElementById('reason');
 
+      // --- NEW FEATURE LOGIC STARTS HERE ---
       const defaultHeading = "भाजपा कार्यालय पर आपका स्वागत है";
-      const defaultReasons = [
-        { value: "", text: "कारण चुनें" },
-        { value: "कार्यालय पर बैठक", text: "कार्यालय पर बैठक" },
-        { value: "जिला अध्यक्ष से भेंट", text: "जिला अध्यक्ष से भेंट" },
-        { value: "ट्रांसफर / शासकीय कार्य / शिकायत", text: "ट्रांसफर / शासकीय कार्य / शिकायत" },
-        { value: "कार्यालय पर सामान्य उपस्थिति", text: "कार्यालय पर सामान्य उपस्थिति" },
-        { value: "अन्य कोई कार्य", text: "अन्य कोई कार्य" }
-      ];
+      const defaultReasonsHTML = `
+        <option value="">कारण चुनें</option>
+        <option>कार्यालय पर बैठक</option>
+        <option>जिला अध्यक्ष से भेंट</option>
+        <option>ट्रांसफर / शासकीय कार्य / शिकायत</option>
+        <option>कार्यालय पर सामान्य उपस्थिति</option>
+        <option>अन्य कोई कार्य</option>
+      `;
+
+      function setFormForEvent(eventName) {
+        formHeading.textContent = eventName;
+        reasonSelect.innerHTML = `<option value="${eventName}" selected>${eventName}</option>`;
+        reasonSelect.disabled = true;
+      }
 
       function setDefaultForm() {
         formHeading.textContent = defaultHeading;
-        reasonSelect.innerHTML = '';
-        defaultReasons.forEach(reason => {
-            const option = document.createElement('option');
-            option.value = reason.value;
-            option.textContent = reason.text;
-            reasonSelect.appendChild(option);
-        });
+        reasonSelect.innerHTML = defaultReasonsHTML;
         reasonSelect.disabled = false;
       }
 
-      setDefaultForm();
+      setDefaultForm(); // Set the default form state on page load
 
-      db.collection("events").where("active", "==", true).onSnapshot(snapshot => {
+      db.collection("events").where("active", "==", true).limit(1).onSnapshot(snapshot => {
         if (!snapshot.empty) {
-          const activeEvent = snapshot.docs[0].data();
-          const eventName = activeEvent.name;
-          formHeading.textContent = eventName;
-          reasonSelect.innerHTML = '';
-          const option = document.createElement('option');
-          option.value = eventName;
-          option.textContent = eventName;
-          option.selected = true;
-          reasonSelect.appendChild(option);
-          reasonSelect.disabled = true;
+          const eventName = snapshot.docs[0].data().name;
+          setFormForEvent(eventName);
         } else {
           setDefaultForm();
         }
@@ -196,7 +236,10 @@
         console.error("Error listening to events:", err);
         setDefaultForm();
       });
+      // --- NEW FEATURE LOGIC ENDS HERE ---
 
+
+      // Your original working functions from script.js
       async function startCamera() {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -217,95 +260,99 @@
       };
 
       mobileInput.addEventListener("blur", async (e) => {
-        try {
-            const mobile = (e.target.value || "").toString().replace(/\D/g, "").slice(-10);
-            e.target.value = mobile;
-            if (mobile.length !== 10) return;
+        const raw = e.target.value;
+        const mobile = normalizeMobile(raw);
+        e.target.value = mobile;
+        if (mobile.length !== 10) return;
 
-            const snap = await db.collection("visitors").where("mobile", "==", mobile).orderBy("timestamp", "desc").limit(1).get();
-            if (!snap.empty) {
-                const data = snap.docs[0].data();
-                form.name.value = data.name || "";
-                form.designation.value = data.designation || "";
-                form.address.value = data.address || "";
-                form.mandal.value = data.mandal || "";
-            }
-        } catch(err) {
-            console.error("Error fetching previous data:", err);
+        // Using original logic for data lookup
+        const [oldSnap, newSnap] = await Promise.all([
+            db.collection("jila_format_2025").where("मोबाइल", "==", mobile).limit(1).get(),
+            db.collection("visitors").where("mobile", "==", mobile).orderBy("timestamp", "desc").limit(1).get()
+        ]);
+
+        const doc = newSnap.docs[0] || oldSnap.docs[0];
+        if (doc) {
+            const data = doc.data();
+            form.name.value = data["नाम"] || data.name || "";
+            form.designation.value = data["पद"] || data.designation || "";
+            form.address.value = data["पता"] || data.address || "";
+            form.mandal.value = data["मंडल"] || data.mandal || "";
         }
       });
 
+      // Your original, working form submission logic
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const submitBtn = form.querySelector("button[type='submit']");
-        
-        const formData = {
-            name: form.name.value.trim(),
-            mobile: form.mobile.value.trim(),
-            designation: form.designation.value.trim(),
-            address: form.address.value.trim(),
-            mandal: form.mandal.value,
-            reason: form.reason.value,
-            selfieData: form.selfieData.value
-        };
-
-        if (!formData.name || !formData.mobile || !formData.designation || !formData.address || !formData.mandal || !formData.reason || !formData.selfieData) {
-            Swal.fire("अपूर्ण जानकारी", "कृपया सभी फ़ील्ड भरें और सेल्फ़ी लें।", "warning");
-            return;
-        }
-        
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
+        submitBtn.textContent = 'Submitting...'; // Give user feedback
+
+        const name = form.name.value.trim(),
+          mobile = normalizeMobile(form.mobile.value.trim()),
+          designation = form.designation.value.trim(),
+          address = form.address.value.trim(),
+          mandal = form.mandal.value,
+          reason = form.reason.value,
+          selfieData = form.selfieData.value;
+
+        if (!name || !mobile || !designation || !address || !mandal || !reason || !selfieData) {
+          Swal.fire("अपूर्ण जानकारी", "सभी फ़ील्ड/सेल्फ़ी भरना ज़रूरी है।", "warning");
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'सबमिट करें';
+          return;
+        }
+
+        if (!navigator.onLine) {
+          queueSave({ name, mobile, designation, address, mandal, reason, selfieData });
+          Swal.fire({
+            title: "ऑफ़लाइन मोड", text: "डेटा सेव कर लिया गया है, इंटरनेट चालू होने पर भेजा जाएगा।",
+            icon: "success", timer: 2000, showConfirmButton: false
+          });
+          form.reset();
+          canvas.style.display = "none";
+          selfieInput.value = "";
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'सबमिट करें';
+          return;
+        }
 
         try {
-            const response = await fetch(formData.selfieData);
-            const imgBlob = await response.blob();
-            
-            const filePath = `selfies/${Date.now()}_${formData.mobile}.jpg`;
-            const up = await storage.ref(filePath).put(imgBlob);
-            const selfieURL = await up.ref.getDownloadURL();
+          const imgBlob = await (await fetch(selfieData)).blob();
+          const filePath = `selfies/${Date.now()}_${mobile}.jpg`;
+          const up = await storage.ref(filePath).put(imgBlob);
+          const selfieURL = await up.ref.getDownloadURL();
 
-            await db.collection("visitors").add({
-                name: formData.name,
-                mobile: formData.mobile,
-                designation: formData.designation,
-                address: formData.address,
-                mandal: formData.mandal,
-                reason: formData.reason,
-                selfie: selfieURL,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
+          await db.collection("visitors").add({
+            name, mobile, designation, address, mandal, reason,
+            selfie: selfieURL,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
 
-            const text = `नया आगंतुक:\nनाम: ${formData.name}\nमोबाइल: ${formData.mobile}\nपद: ${formData.designation}\nमंडल: ${formData.mandal}\nपता: ${formData.address}\nकारण: ${formData.reason}\n📷 Selfie: ${selfieURL}`;
-            // We don't wait for this to finish
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
-            }).catch(err => console.warn("Telegram notification failed:", err));
+          const text = `नया आगंतुक:\nनाम: ${name}\nमोबाइल: ${mobile}\nपद: ${designation}\nमंडल: ${mandal}\nपता: ${address}\nकारण: ${reason}\n📷 Selfie: ${selfieURL}`;
+          fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
+          }).catch(err => console.warn("Telegram API error:", err));
 
-            // Use 'then' to ensure UI updates happen after the modal closes
-            Swal.fire({
-                title: "✅ धन्यवाद!",
-                text: "आपकी जानकारी सफलतापूर्वक सेव हो गई है।",
-                icon: "success",
-                timer: 1500,
-                showConfirmButton: false
-            }).then(() => {
-                form.reset();
-                canvas.style.display = 'none';
-                selfieInput.value = '';
-                startCamera();
-            });
-
+          Swal.fire({
+            title: "✅ धन्यवाद!", text: "आपकी जानकारी सफलतापूर्वक सेव हो गई है।",
+            icon: "success", timer: 1500, showConfirmButton: false
+          });
+          form.reset();
+          canvas.style.display = "none";
+          selfieInput.value = "";
         } catch (err) {
-            console.error("❌ Submit Error:", err);
-            Swal.fire("त्रुटि", "कुछ त्रुटि हुई, कृपया पुनः प्रयास करें।", "error");
+          console.error("❌ Submit Error:", err);
+          Swal.fire("त्रुटि", "कुछ त्रुटि हुई, कृपया पुनः प्रयास करें।", "error");
         } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'सबमिट करें';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'सबमिट करें';
         }
       });
+
+      processQueue();
+      window.addEventListener("online", processQueue);
     });
   </script>
 </body>
