@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>आगंतुक पंजीयन</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:linear-gradient(135deg,#ff6a00,#ffa41b);font-family:'Noto Sans Devanagari',sans-serif;display:flex;justify-content:center;padding:20px 0}
+    .container{background:#fff8ef;width:100%;max-width:600px;border-radius:12px;padding:30px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+    h2{text-align:center;color:#ff6a00;margin-bottom:20px}
+    label{display:block;margin-top:15px;margin-bottom:5px;font-weight:bold;color:#555}
+    input[type="text"],input[type="tel"],select{width:100%;padding:10px 14px;border:1px solid #ccc;border-radius:6px;font-size:16px}
+    button{width:100%;padding:12px;background:#ff6a00;color:#fff;font-size:16px;font-weight:bold;border:none;border-radius:8px;cursor:pointer;margin-top:20px}
+    button:hover{background:#e65e00}
+    video,canvas{width:70%;max-width:250px;margin:10px auto;display:block;border-radius:8px}
+  </style>
+
+  <!-- Firebase compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="container">
+    <h2 id="formHeading">भाजपा कार्यालय पर आपका स्वागत है</h2>
+
+    <form id="visitor-form">
+      <label for="mobile">मोबाइल नंबर:</label>
+      <input type="tel" id="mobile" name="mobile" required pattern="[0-9]{10}" placeholder="10 अंकों का मोबाइल नंबर">
+
+      <label for="name">नाम:</label>
+      <input type="text" id="name" name="name" required placeholder="अपना नाम दर्ज करें">
+
+      <label for="designation">पद:</label>
+      <input type="text" id="designation" name="designation" required placeholder="आपका पद दर्ज करें">
+
+      <label for="address">पता / वार्ड / बूथ:</label>
+      <input type="text" id="address" name="address" required placeholder="पूरा पता लिखें">
+
+      <label for="mandal">मंडल:</label>
+      <select id="mandal" name="mandal" required>
+        <option value="">मंडल चुनें</option>
+        <option>भेंसोदा</option><option>भानपुरा</option><option>गरोठ</option><option>मेलखेडा</option>
+        <option>खड़ावदा</option><option>शामगढ़</option><option>सुवासरा</option><option>बसाई</option>
+        <option>सीतामऊ</option><option>क्यामपुर</option><option>सीतामऊ ग्रामीण</option><option>गुर्जर बरडिया</option>
+        <option>धुंदधड़का</option><option>बुढा</option><option>पिपलिया मंडी</option><option>मल्हारगढ़</option>
+        <option>दलोदा</option><option>मगरामाता जी</option><option>मंदसौर ग्रामीण</option><option>मंदसौर उत्तर</option>
+        <option>मंदसौर दक्षिण</option><option>अन्य जिले से आये</option>
+      </select>
+
+      <label for="reason">आने का कारण:</label>
+      <select id="reason" name="reason" required>
+        <!-- Active इवेंट आने पर यह सूची ऊपर इवेंट डाल देगी और उसे प्री-सेलेक्ट कर देगी -->
+        <option value="">कारण चुनें</option>
+        <option>कार्यालय पर बैठक</option>
+        <option>जिला अध्यक्ष से भेंट</option>
+        <option>ट्रांसफर / शासकीय कार्य / शिकायत</option>
+        <option>कार्यालय पर सामान्य उपस्थिति</option>
+        <option>अन्य कोई कार्य</option>
+      </select>
+
+      <label>सेल्फी लें:</label>
+      <video id="camera" autoplay playsinline></video>
+      <canvas id="snapshot" style="display:none;"></canvas>
+      <input type="hidden" id="selfieData" name="selfieData">
+      <button type="button" id="captureBtn">📷 फोटो लें</button>
+
+      <button type="submit">सबमिट करें</button>
+    </form>
+  </div>
+
+  <script>
+    // === Firebase ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
+      authDomain: "bjplivefirebase.firebaseapp.com",
+      projectId: "bjplivefirebase",
+      storageBucket: "bjplivefirebase.appspot.com"
+    };
+    if (!firebase.apps?.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // DOM
+    const form = document.getElementById("visitor-form");
+    const formHeading = document.getElementById("formHeading");
+    const reasonSel = document.getElementById("reason");
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("snapshot");
+    const selfieInput = document.getElementById("selfieData");
+    const captureBtn = document.getElementById("captureBtn");
+
+    // Camera
+    async function startCamera(){
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch(e){ console.warn("कैमरा शुरू नहीं:", e?.message||e); }
+    }
+    startCamera();
+
+    // Photo
+    captureBtn.addEventListener("click", () => {
+      const ctx = canvas.getContext("2d");
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      selfieInput.value = canvas.toDataURL("image/jpeg");
+      canvas.style.display = "block";
+    });
+
+    // --- Live config & events → header + active event prefill ---
+    let EVENT_NAMES = new Set();
+    function addEventOptionIfMissing(name){
+      if (!name) return;
+      if (!Array.from(reasonSel.options).some(o => o.value === name)){
+        const op = document.createElement("option");
+        op.value = name; op.textContent = name;
+        reasonSel.insertBefore(op, reasonSel.firstChild.nextSibling); // "कारण चुनें" के ठीक बाद
+      }
+    }
+
+    // config (header + activeEventName)
+    db.collection("config").doc("app").onSnapshot(doc => {
+      const cfg = doc.exists ? doc.data() : {};
+      if (cfg.header) formHeading.textContent = cfg.header;
+      if (cfg.activeEventName){
+        addEventOptionIfMissing(cfg.activeEventName);
+        reasonSel.value = cfg.activeEventName; // प्रीफिल
+      }
+    });
+
+    // events list भी सुन लें ताकि पूरे इवेंट कारणों में उपलब्ध रहें
+    db.collection("events").orderBy("name").onSnapshot(snap => {
+      EVENT_NAMES = new Set(snap.docs.map(d => d.data().name || ""));
+      // इवेंट्स को कारण में ऊपर जोड़ें (डुप्लीकेट से बचें)
+      EVENT_NAMES.forEach(n => addEventOptionIfMissing(n));
+    });
+
+    // मोबाइल पर पुराने डेटा से प्रीफिल (वैकल्पिक)
+    function normalizeMobile(input){
+      let d = (input || "").toString().replace(/\D/g,"");
+      if (d.length > 10) d = d.slice(-10);
+      return d;
+    }
+    document.getElementById("mobile").addEventListener("blur", async (e) => {
+      const mob = normalizeMobile(e.target.value);
+      e.target.value = mob;
+      if (mob.length !== 10) return;
+      const [oldSnap, newSnap] = await Promise.all([
+        db.collection("jila_format_2025").where("मोबाइल","==",mob).limit(1).get(),
+        db.collection("visitors").where("mobile","==",mob).limit(1).get()
+      ]);
+      const doc = newSnap.docs[0] || oldSnap.docs[0];
+      if (doc){
+        const d = doc.data();
+        form.name.value = d["नाम"] || d["name"] || "";
+        form.designation.value = d["पद"] || d["designation"] || "";
+        form.address.value = d["पता"] || d["address"] || "";
+        form.mandal.value = d["मंडल"] || d["mandal"] || "";
+      }
+    });
+
+    // Submit
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = form.querySelector("button[type='submit']");
+      btn.disabled = true;
+
+      const name = form.name.value.trim();
+      const mobile = normalizeMobile(form.mobile.value.trim());
+      const designation = form.designation.value.trim();
+      const address = form.address.value.trim();
+      const mandal = form.mandal.value;
+      const reason = form.reason.value;
+      const selfieData = selfieInput.value;
+
+      if (!name || !mobile || !designation || !address || !mandal || !reason || !selfieData) {
+        alert("सभी फ़ील्ड/सेल्फ़ी भरना ज़रूरी है।");
+        btn.disabled = false; return;
+      }
+
+      try{
+        const imgBlob = await (await fetch(selfieData)).blob();
+        const filePath = `selfies/${Date.now()}_${mobile}.jpg`;
+        const up = await storage.ref(filePath).put(imgBlob);
+        const selfieURL = await up.ref.getDownloadURL();
+
+        await db.collection("visitors").add({
+          name, mobile, designation, address, mandal, reason,
+          selfie: selfieURL,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        Swal.fire({ title:"✅ धन्यवाद!", text:"आपकी जानकारी सेव हो गई है।", icon:"success", timer:1500, showConfirmButton:false });
+        form.reset(); canvas.style.display="none"; selfieInput.value=""; startCamera();
+      } catch(err){
+        console.error("Submit error:", err);
+        Swal.fire("त्रुटि", "कृपया पुनः प्रयास करें।", "error");
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>
