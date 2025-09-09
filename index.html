@@ -13,6 +13,7 @@
     label { display: block; margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #555; }
     input[type="text"], input[type="tel"], select { width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
     button, input[type="button"] { width: 100%; padding: 12px; background-color: #ff6a00; color: white; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; }
+    button:disabled { background-color: #cccccc; cursor: not-allowed; }
     video, canvas { width: 70%; max-width: 250px; margin: 10px auto; display: block; border-radius: 8px; }
   </style>
 </head>
@@ -61,7 +62,7 @@
       apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
       authDomain: "bjplivefirebase.firebaseapp.com",
       projectId: "bjplivefirebase",
-      storageBucket: "bjplivefirebase.firebasestorage.app",
+      storageBucket: "bjplivefirebase.appspot.com", // Corrected storage bucket
       messagingSenderId: "236867156337",
       appId: "1:236867156337:web:1fbd6c535689a6f34d5ed0"
     };
@@ -88,7 +89,6 @@
         } else { setDefaultForm(); }
       });
 
-      // --- NEW 3-WAY AUTO-FILL LOGIC ---
       mobileInput.addEventListener("blur", async (e) => {
         const mobile = (e.target.value || "").toString().replace(/\D/g, "").slice(-10);
         e.target.value = mobile;
@@ -101,38 +101,117 @@
           form.mandal.value = data.mandal || data["मंडल"] || "";
         };
 
-        // Priority 1: Check 'contacts' collection
         const contactSnap = await db.collection("contacts").doc(mobile).get();
-        if (contactSnap.exists) { // FIXED: Changed .exists() to .exists for compat library
+        if (contactSnap.exists) {
           fillForm(contactSnap.data());
           return;
         }
 
-        // Priority 2: Check 'jila_format_2025' collection
         const jilaSnap = await db.collection("jila_format_2025").where("मोबाइल", "==", mobile).limit(1).get();
         if (!jilaSnap.empty) {
           fillForm(jilaSnap.docs[0].data());
           return;
         }
 
-        // Priority 3: Check 'visitors' collection for past visits
         const visitorSnap = await db.collection("visitors").where("mobile", "==", mobile).orderBy("timestamp", "desc").limit(1).get();
         if (!visitorSnap.empty) {
           fillForm(visitorSnap.docs[0].data());
         }
       });
       
-      // Camera and Submission logic is unchanged and working
       const video = document.getElementById("camera");
       const canvas = document.getElementById("snapshot");
       const selfieInput = document.getElementById("selfieData");
-      async function startCamera() { try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); video.srcObject = stream; } catch (err) { console.warn("Camera error:", err); } }
+      async function startCamera() { try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); video.srcObject = stream; } catch (err) { console.warn("Camera error:", err); Swal.fire('कैमरा त्रुटि!', 'कैमरा शुरू नहीं हो सका। कृपया अनुमति दें।', 'error'); } }
       startCamera();
-      window.capturePhoto = function () { const ctx = canvas.getContext("2d"); canvas.width = video.videoWidth; canvas.height = video.videoHeight; ctx.drawImage(video, 0, 0); selfieInput.value = canvas.toDataURL("image/jpeg"); canvas.style.display = "block"; };
-      // The original working submission logic from your ZIP file is preserved here.
-      form.addEventListener("submit", async (e) => { e.preventDefault(); /* ... original working submission logic ... */ });
+      
+      window.capturePhoto = function () { 
+          const ctx = canvas.getContext("2d"); 
+          canvas.width = video.videoWidth; 
+          canvas.height = video.videoHeight; 
+          ctx.drawImage(video, 0, 0); 
+          selfieInput.value = canvas.toDataURL("image/jpeg", 0.8); // Compress image slightly
+          canvas.style.display = "block"; 
+          video.style.display = "none";
+      };
+
+      // --- ADDED FORM SUBMISSION LOGIC ---
+      form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const submitButton = form.querySelector('button[type="submit"]');
+          submitButton.disabled = true;
+          submitButton.textContent = 'सबमिट हो रहा है...';
+
+          try {
+              const mobile = form.mobile.value;
+              const name = form.name.value;
+              const selfieData = form.selfieData.value;
+
+              if (!mobile || !name) {
+                  Swal.fire('त्रुटि!', 'कृपया मोबाइल नंबर और नाम भरें।', 'error');
+                  return;
+              }
+
+              if (!selfieData) {
+                  Swal.fire('त्रुटि!', 'कृपया सबमिट करने से पहले एक फोटो लें।', 'error');
+                  return;
+              }
+
+              // 1. Upload photo to Firebase Storage
+              const timestamp = new Date();
+              const filePath = `visitor_selfies/${mobile}_${timestamp.getTime()}.jpg`;
+              const storageRef = storage.ref(filePath);
+              const uploadTask = await storageRef.putString(selfieData, 'data_url');
+              const photoURL = await uploadTask.ref.getDownloadURL();
+
+              // 2. Prepare data for Firestore
+              const visitorData = {
+                  mobile: mobile,
+                  name: name,
+                  designation: form.designation.value,
+                  address: form.address.value,
+                  mandal: form.mandal.value,
+                  reason: reasonSelect.disabled ? reasonSelect.value : form.reason.value,
+                  photoURL: photoURL,
+                  timestamp: firebase.firestore.FieldValue.serverTimestamp()
+              };
+
+              // 3. Save data to Firestore
+              await db.collection("visitors").add(visitorData);
+              
+              await db.collection("contacts").doc(mobile).set({
+                  name: visitorData.name,
+                  designation: visitorData.designation,
+                  address: visitorData.address,
+                  mandal: visitorData.mandal,
+                  lastVisit: visitorData.timestamp
+              }, { merge: true });
+
+              Swal.fire({
+                  title: 'सफलतापूर्वक!',
+                  text: 'आपकी जानकारी सफलतापूर्वक सबमिट हो गई है।',
+                  icon: 'success',
+                  timer: 2000,
+                  showConfirmButton: false
+              });
+
+              // 4. Reset form
+              form.reset();
+              canvas.style.display = 'none';
+              video.style.display = 'block';
+              selfieInput.value = '';
+              setDefaultForm();
+              startCamera();
+
+          } catch (error) {
+              console.error("Submission Error: ", error);
+              Swal.fire('त्रुटि!', 'फॉर्म सबमिट करने में कोई समस्या हुई। कृपया पुनः प्रयास करें।', 'error');
+          } finally {
+              submitButton.disabled = false;
+              submitButton.textContent = 'सबमिट करें';
+          }
+      });
     });
   </script>
 </body>
 </html>
-
