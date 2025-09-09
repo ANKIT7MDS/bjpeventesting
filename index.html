@@ -62,7 +62,7 @@
       apiKey: "AIzaSyD-xaGtrczkUCT7rwEOuRnHzVE9AohYsKU",
       authDomain: "bjplivefirebase.firebaseapp.com",
       projectId: "bjplivefirebase",
-      storageBucket: "bjplivefirebase.appspot.com", // Corrected storage bucket
+      storageBucket: "bjplivefirebase.appspot.com",
       messagingSenderId: "236867156337",
       appId: "1:236867156337:web:1fbd6c535689a6f34d5ed0"
     };
@@ -130,12 +130,28 @@
           canvas.width = video.videoWidth; 
           canvas.height = video.videoHeight; 
           ctx.drawImage(video, 0, 0); 
-          selfieInput.value = canvas.toDataURL("image/jpeg", 0.8); // Compress image slightly
+          selfieInput.value = canvas.toDataURL("image/jpeg", 0.8);
           canvas.style.display = "block"; 
           video.style.display = "none";
       };
 
-      // --- ADDED FORM SUBMISSION LOGIC ---
+      // --- Helper function to highlight invalid fields ---
+      function highlightInvalid(elements) {
+        elements.forEach(el => {
+            if (!el) return;
+            el.style.transition = 'border 0.2s';
+            el.style.border = '2px solid red';
+            setTimeout(() => {
+                if (el.tagName.toLowerCase() === 'button') {
+                    el.style.border = 'none';
+                } else {
+                    el.style.border = '1px solid #ccc';
+                }
+            }, 3000);
+        });
+      }
+
+      // --- IMPROVED FORM SUBMISSION LOGIC ---
       form.addEventListener("submit", async (e) => {
           e.preventDefault();
           const submitButton = form.querySelector('button[type="submit"]');
@@ -147,13 +163,19 @@
               const name = form.name.value;
               const selfieData = form.selfieData.value;
 
+              // Improved Validation Feedback
               if (!mobile || !name) {
                   Swal.fire('त्रुटि!', 'कृपया मोबाइल नंबर और नाम भरें।', 'error');
-                  return;
+                  const invalidElements = [];
+                  if (!mobile) invalidElements.push(form.mobile);
+                  if (!name) invalidElements.push(form.name);
+                  highlightInvalid(invalidElements);
+                  return; 
               }
 
               if (!selfieData) {
                   Swal.fire('त्रुटि!', 'कृपया सबमिट करने से पहले एक फोटो लें।', 'error');
+                  highlightInvalid([form.querySelector('button[onclick="capturePhoto()"]')]);
                   return;
               }
 
@@ -178,7 +200,6 @@
 
               // 3. Save data to Firestore
               await db.collection("visitors").add(visitorData);
-              
               await db.collection("contacts").doc(mobile).set({
                   name: visitorData.name,
                   designation: visitorData.designation,
@@ -205,7 +226,8 @@
 
           } catch (error) {
               console.error("Submission Error: ", error);
-              Swal.fire('त्रुटि!', 'फॉर्म सबमिट करने में कोई समस्या हुई। कृपया पुनः प्रयास करें।', 'error');
+              // More Detailed Error Message
+              Swal.fire('सबमिशन में त्रुटि!', `एक समस्या हुई: ${error.code || error.message}`, 'error');
           } finally {
               submitButton.disabled = false;
               submitButton.textContent = 'सबमिट करें';
@@ -215,3 +237,4 @@
   </script>
 </body>
 </html>
+
