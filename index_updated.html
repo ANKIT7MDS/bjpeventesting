@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>आगंतुक पंजीयन</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- ✅ id जोड़ा गया: formHeading -->
+    <h2 id="formHeading">भाजपा कार्यालय पर आपका स्वागत है</h2>
+
+    <form id="visitor-form">
+      <!-- मोबाइल नंबर सबसे ऊपर -->
+      <label for="mobile">मोबाइल नंबर:</label>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <input type="tel" id="mobile" name="mobile" required pattern="[0-9]{10}" placeholder="10 अंकों का मोबाइल नंबर" style="flex: 1;">
+        <span style="cursor: pointer; font-size: 20px; margin-top: 4px;">🔍</span>
+      </div>
+
+      <label for="name">नाम:</label>
+      <input type="text" id="name" name="name" required placeholder="अपना नाम दर्ज करें">
+
+      <label for="designation">पद:</label>
+      <input type="text" id="designation" name="designation" required placeholder="आपका पद दर्ज करें">
+
+      <label for="address">पता / वार्ड / बूथ:</label>
+      <input type="text" id="address" name="address" required placeholder="पूरा पता लिखें">
+
+      <label for="mandal">मंडल:</label>
+      <select id="mandal" name="mandal" required>
+        <option value="">मंडल चुनें</option>
+        <option>भेंसोदा</option><option>भानपुरा</option><option>गरोठ</option><option>मेलखेडा</option>
+        <option>खड़ावदा</option><option>शामगढ़</option><option>सुवासरा</option><option>बसाई</option>
+        <option>सीतामऊ</option><option>क्यामपुर</option><option>सीतामऊ ग्रामीण</option><option>गुर्जर बरडिया</option>
+        <option>धुंदधड़का</option><option>बुढा</option><option>पिपलिया मंडी</option><option>मल्हारगढ़</option>
+        <option>दलोदा</option><option>मगरामाता जी</option><option>मंदसौर ग्रामीण</option><option>मंदसौर उत्तर</option>
+        <option>मंदसौर दक्षिण</option><option>अन्य जिले से आये</option>
+      </select>
+
+      <label for="reason">आने का कारण:</label>
+      <select id="reason" name="reason" required>
+        <option value="">कारण चुनें</option>
+        <option>कार्यालय पर बैठक</option><option>जिला अध्यक्ष से भेंट</option>
+        <option>ट्रांसफर / शासकीय कार्य / शिकायत</option><option>कार्यालय पर सामान्य उपस्थिति</option>
+        <option>अन्य कोई कार्य</option>
+      </select>
+
+      <label>सेल्फी लें:</label>
+      <video id="camera" autoplay playsinline></video>
+      <canvas id="snapshot" style="display:none;"></canvas>
+      <input type="hidden" id="selfieData" name="selfieData">
+      <button type="button" onclick="capturePhoto()">📷 फोटो लें</button>
+
+      <button type="submit">सबमिट करें</button>
+    </form>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Custom JS -->
+  <script src="script.js"></script>
+</body>
+</html>
